@@ -3,7 +3,6 @@
 set -e
 
 BASEDIR=$(realpath $(dirname "$0"))
-VERUS_DIR=$BASEDIR/../../verus
 
 # build the rlib file for libc crate, which verus-mimalloc takes as a dependency
 
@@ -21,7 +20,7 @@ g++ -g -fPIC -std=c++17 -O2 -Wall -c overrides.cpp -o ../build/overrides.o
 # TODO use no-alloc
 # TODO turn on optimizations
 
-$VERUS_DIR/source/target-verus/release/verus \
+verus \
     --extern libc=../build/liblibc.rlib \
     lib.rs \
     --compile --no-verify \

@@ -1,3 +1,5 @@
+Some notes about the way the verified memory allocator interacts with the OS. For more details about the allocator itself, see the `verus-mimalloc/` directory.
+
 ### Glue code
 
 The `build-verus-mimalloc.sh` script builds a `.so` file that can be linked to a binary to override the system allocator. This only works on *Linux* at the moment.

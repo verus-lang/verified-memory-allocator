@@ -1,4 +1,4 @@
 # channel needs to match the version used by Verus's rust-toolchain
 
 [toolchain]
-channel = "1.71.1"
+channel = "1.76.0"

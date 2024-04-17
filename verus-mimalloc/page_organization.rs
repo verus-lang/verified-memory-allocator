@@ -4502,6 +4502,8 @@ state_machine!{ PageOrg {
             assert(!self.does_count(page_id));
         } else {
             assert(idx - 1 == page_id.idx);
+            assert(self.ucount_sum(page_id.segment_id, idx - 1)
+              + self.one_count(PageId { segment_id: page_id.segment_id, idx: (idx - 1) as nat }) == 0);
             assert(!self.does_count(page_id));
         }
     }

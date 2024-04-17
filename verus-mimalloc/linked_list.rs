@@ -1508,7 +1508,7 @@ impl ThreadLLSimple {
         let tracked mut block_token_opt = Some(block_token);
 
         loop
-            invariant
+            invariant_except_break
                 block_token_opt == Some(block_token),
 
                 self.wf(),

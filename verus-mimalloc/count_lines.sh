@@ -1,4 +1,4 @@
-DIR=/Users/tjhance/Dropbox/verus-systems-code/memory-allocators/verus-mimalloc
+DIR=/Users/tjhance/Dropbox/vmi/verus-mimalloc
 LCDIR=/Users/tjhance/Dropbox/verus/source/tools/line_count
 
 rm -rf lib.d

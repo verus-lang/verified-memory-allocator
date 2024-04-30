@@ -60,7 +60,6 @@ pub proof fn global_init() -> (tracked res: (Global, Map<ThreadId, Mim::right_to
 {
     let tracked (Tracked(instance), Tracked(right_to_set_inst), _, _, Tracked(rights), _, _, _, _, _, _, _, _) = Mim::Instance::initialize(
         Map::tracked_empty(), Map::tracked_empty(), Map::tracked_empty(),
-        Map::tracked_empty(), Map::tracked_empty(), Map::tracked_empty(),
         );
     let tracked my_inst = instance.set_inst(instance, right_to_set_inst.tracked_unwrap());
     (Global { instance, my_inst }, rights)

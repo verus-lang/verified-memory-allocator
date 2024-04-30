@@ -314,13 +314,10 @@ tokenized_state_machine!{ Mim {
 
         // Storage
 
-        #[sharding(storage_map)] pub segment_local_access: Map<SegmentId, SegmentLocalAccess>,
         #[sharding(storage_map)] pub segment_shared_access: Map<SegmentId, SegmentSharedAccess>,
 
-        #[sharding(storage_map)] pub page_local_access: Map<PageId, PageLocalAccess>,
         #[sharding(storage_map)] pub page_shared_access: Map<PageId, PageSharedAccess>,
 
-        #[sharding(storage_map)] pub heap_local_access: Map<HeapId, HeapLocalAccess>,
         #[sharding(storage_map)] pub heap_shared_access: Map<HeapId, HeapSharedAccess>,
 
         // PAPER CUT
@@ -350,11 +347,8 @@ tokenized_state_machine!{ Mim {
             init heap_of_page = Map::empty();
             init actor = Map::empty();
             init delay_actor = Map::empty();
-            init segment_local_access = Map::empty();
             init segment_shared_access = Map::empty();
-            init page_local_access = Map::empty();
             init page_shared_access = Map::empty();
-            init heap_local_access = Map::empty();
             init heap_shared_access = Map::empty();
             init heap_to_thread = Map::empty();
             init reserved_uniq = Set::empty();
@@ -489,18 +483,6 @@ tokenized_state_machine!{ Mim {
         }
     }
 
-    /*transition!{
-        actor_access_segment(segment_id: SegmentId) {
-            have thread_of_segment >= [segment_id => let thread_id];
-            remove actor -= [thread_id => let actor];
-
-            require(actor != Actor::Abandoned);
-
-            birds_eye let ssa = pre.segment_local_access.index(segment_id);
-            add actor += [thread_id => Actor::AccessingMySegment(segment_id, ssa)];
-        }
-    }*/
-
     transition!{
         actor_make_idle(thread_id: ThreadId) {
             remove actor -= [thread_id => let actor];
@@ -516,14 +498,6 @@ tokenized_state_machine!{ Mim {
             add actor += [thread_id => Actor::Abandoned];
         }
     }
-
-
-    /*property!{
-        actor_guards_segment(thread_id: ThreadId) {
-            have actor >= [thread_id => let Actor::AccessingMySegment(segment_id, ssa)];
-            guard segment_local_access >= [segment_id => ssa];
-        }
-    }*/
 
     // Delay states and delay actors
 

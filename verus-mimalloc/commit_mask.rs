@@ -645,24 +645,24 @@ impl CommitMask {
             assert((i * 64 + ofs) % 64 == ofs) by (nonlinear_arith)
                 requires ofs < 64;
             loop
-                invariant
+                invariant_except_break
                     mask & 1 == 1,
                     i < 8,
                     mask == self.mask[i as int] >> mod64((next_idx + count) as usize),
                     (next_idx + count) / 64 == i,
-                invariant_ensures
+                invariant
                     forall|j: usize| next_idx <= j < next_idx + count ==> #[trigger] is_bit_set(self.mask[div64(j) as int], mod64(j)),
                 ensures
                     next_idx + count <= 512
             {
                 proof { const_facts(); }
                 loop
-                    invariant
+                    invariant_except_break
                         mask & 1 == 1,
                         i < 8,
                         mask == self.mask[i as int] >> mod64((next_idx + count) as usize),
                         (next_idx + count) / 64 == i,
-                    invariant_ensures
+                    invariant
                         forall|j: usize| next_idx <= j < next_idx + count ==> #[trigger] is_bit_set(self.mask[div64(j) as int], mod64(j)),
                     ensures
                         mask & 1 == 0,

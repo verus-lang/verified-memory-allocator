@@ -7,7 +7,7 @@ use vstd::modes::*;
 use vstd::*;
 use vstd::set_lib::*;
 use vstd::layout::*;
-use crate::atomic_ghost_modified::*;
+use vstd::atomic_ghost::*;
 
 use crate::tokens::{Mim, BlockId, PageId, DelayState, HeapId};
 use crate::layout::{is_block_ptr, block_size_ge_word, block_ptr_aligned_to_word, block_start_at, block_start};
@@ -1518,7 +1518,7 @@ impl ThreadLLSimple {
                 block_token@.value.heap_id == Some(self.heap_id@),
                 is_block_ptr(ptr.id(), block_token@.key),
         {
-            let next_int = my_atomic_with_ghost!(
+            let next_int = atomic_with_ghost!(
                 &self.atomic => load(); ghost g => { });
             let next_ptr = PPtr::<Node>::from_usize(next_int);
 
@@ -1530,7 +1530,7 @@ impl ThreadLLSimple {
             let (Tracked(ptr_mem0), Tracked(raw_mem0)) = LL::block_write_ptr(ptr, Tracked(points_to_raw), next_ptr);
 
             let p = ptr.to_usize();
-            let cas_result = my_atomic_with_ghost!(
+            let cas_result = atomic_with_ghost!(
                 &self.atomic => compare_exchange_weak(next_int, p);
                 returning cas_result;
                 ghost ghost_ll =>
@@ -1575,7 +1575,7 @@ impl ThreadLLSimple {
 
         let tracked ll: LL;
         let p = PPtr::<Node>::from_usize(0);
-        let res = my_atomic_with_ghost!(
+        let res = atomic_with_ghost!(
             &self.atomic => swap(0);
             ghost g => {
                 ll = g;
@@ -1767,7 +1767,7 @@ impl ThreadLLWithDelayBits {
             data: Ghost(data),
             perms: Tracked(Map::tracked_empty()),
         };
-        my_atomic_with_ghost!(
+        atomic_with_ghost!(
             &self.atomic => no_op();
             update old_v -> v;
             ghost g => {
@@ -1851,7 +1851,7 @@ impl ThreadLLWithDelayBits {
         // uses a compare-and-swap loop. But we can just use fetch_xor so I thought
         // I'd simplify it
 
-        my_atomic_with_ghost!(
+        atomic_with_ghost!(
             &self.atomic => fetch_xor(3);
             update v_old -> v_new;
             ghost g => {
@@ -1900,7 +1900,7 @@ impl ThreadLLWithDelayBits {
         {
             let ghost mut the_ptr;
             let ghost mut the_delay;
-            let tfree = my_atomic_with_ghost!(&self.atomic => load(); ghost g => {
+            let tfree = atomic_with_ghost!(&self.atomic => load(); ghost g => {
                 self.emp_inst.borrow().agree(self.emp.borrow(), &g.0);
                 the_ptr = g.1.unwrap().1.ptr();
                 the_delay = g.1.unwrap().0.view().value;
@@ -1940,7 +1940,7 @@ impl ThreadLLWithDelayBits {
         {
             let ghost mut the_ptr;
             let ghost mut the_delay;
-            let tfree = my_atomic_with_ghost!(&self.atomic => load(); ghost g => {
+            let tfree = atomic_with_ghost!(&self.atomic => load(); ghost g => {
                 self.emp_inst.borrow().agree(self.emp.borrow(), &g.0);
                 the_ptr = g.1.unwrap().1.ptr();
                 the_delay = g.1.unwrap().0.view().value;
@@ -1961,7 +1961,7 @@ impl ThreadLLWithDelayBits {
             }
 
             if old_delay != 1 {
-                let res = my_atomic_with_ghost!(
+                let res = atomic_with_ghost!(
                     &self.atomic => compare_exchange_weak(tfree, tfreex);
                     returning cas_result;
                     ghost g => {
@@ -1997,7 +1997,7 @@ impl ThreadLLWithDelayBits {
     {
         let tracked ll: LL;
         let p = PPtr::<Node>::from_usize(0);
-        let res = my_atomic_with_ghost!(
+        let res = atomic_with_ghost!(
             &self.atomic => fetch_and(3);
             update old_v -> new_v;
             ghost g => {

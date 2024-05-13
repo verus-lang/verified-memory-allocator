@@ -8,8 +8,7 @@ use vstd::*;
 use vstd::modes::*;
 use vstd::set_lib::*;
 use vstd::pervasive::*;
-
-use crate::atomic_ghost_modified::*;
+use vstd::atomic_ghost::*;
 
 use crate::tokens::{Mim, BlockId, DelayState, PageId, PageState};
 use crate::types::*;
@@ -109,7 +108,7 @@ fn page_queue_find_free_ex(heap_ptr: HeapPtr, pq: usize, first_try: bool, Tracke
     }
 
     loop
-        invariant_ensures
+        invariant
             local.wf(),
             heap_ptr.wf(),
             heap_ptr.is_in(*local),

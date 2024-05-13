@@ -4,8 +4,8 @@ use vstd::prelude::*;
 use vstd::ptr::*;
 use vstd::modes::*;
 use vstd::*;
-use crate::atomic_ghost_modified::*;
 use vstd::cell::*;
+use vstd::atomic_ghost::*;
 use state_machines_macros::*;
 
 use crate::config::*;
@@ -17,6 +17,7 @@ use crate::os_mem::MemChunk;
 use crate::commit_mask::CommitMask;
 use crate::bin_sizes::{valid_bin_idx, size_of_bin, smallest_bin_fitting_size};
 use crate::arena::{ArenaId, MemId};
+use crate::duplicable::Duplicable;
 
 verus!{
 
@@ -187,7 +188,7 @@ impl AtomicHeapPtr {
             hop@@.key == old(self).page_id@,
     {
         let tracked mut heap_of_page;
-        my_atomic_with_ghost!(
+        atomic_with_ghost!(
             &self.atomic => no_op();
             ghost g => {
                 let tracked (mut y, heap_of_page_opt) = g;
@@ -1803,7 +1804,7 @@ impl PagePtr {
         ensures heap.wf(), heap.is_in(*local),
     {
         let page_ref = self.get_ref(Tracked(&*local));
-        let h = my_atomic_with_ghost!(
+        let h = atomic_with_ghost!(
             &page_ref.xheap.atomic => load();
             ghost g => {
                 page_ref.xheap.emp_inst.borrow().agree(page_ref.xheap.emp.borrow(), &g.0);

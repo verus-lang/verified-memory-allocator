@@ -10,8 +10,7 @@ use vstd::set_lib::*;
 use vstd::pervasive::*;
 use vstd::set_lib::*;
 use vstd::cell::*;
-
-use crate::atomic_ghost_modified::*;
+use vstd::atomic_ghost::*;
 
 use crate::tokens::{Mim, BlockId, DelayState, PageId, PageState, SegmentState, ThreadId};
 use crate::types::*;

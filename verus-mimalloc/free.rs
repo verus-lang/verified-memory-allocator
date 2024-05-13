@@ -5,8 +5,6 @@ use vstd::ptr::*;
 use vstd::*;
 use vstd::modes::*;
 
-use crate::atomic_ghost_modified::*;
-
 use core::intrinsics::{likely, unlikely};
 
 use crate::tokens::{Mim, BlockId, DelayState};
@@ -96,7 +94,7 @@ pub fn free(ptr: PPtr<u8>, Tracked(user_perm): Tracked<ptr::PointsToRaw>, Tracke
 
     // Determine if this operation is thread local or not
 
-    let segment_thread_id_u64 = my_atomic_with_ghost!(
+    let segment_thread_id_u64 = atomic_with_ghost!(
         &segment.thread_id => load();
         returning thread_id_u64;
         ghost g => {
@@ -331,7 +329,7 @@ fn free_block_mt(page: PagePtr, ptr: PPtr<u8>, Tracked(perm): Tracked<ptr::Point
 
         let ghost mut next_ptr;
         let ghost mut delay;
-        let mask = my_atomic_with_ghost!(&pag.xthread_free.atomic => load(); ghost g => {
+        let mask = atomic_with_ghost!(&pag.xthread_free.atomic => load(); ghost g => {
             pag.xthread_free.emp_inst.borrow().agree(pag.xthread_free.emp.borrow(), &g.0);
             next_ptr = g.1.unwrap().1.ptr();
             delay = g.1.unwrap().0.view().value; // TODO fix macro syntax in atomic_with_ghost
@@ -370,7 +368,7 @@ fn free_block_mt(page: PagePtr, ptr: PPtr<u8>, Tracked(perm): Tracked<ptr::Point
 
         assert(pag.xthread_free.instance == mim_instance);
 
-        let cas_result = my_atomic_with_ghost!(
+        let cas_result = atomic_with_ghost!(
             &pag.xthread_free.atomic => compare_exchange_weak(mask, mask1);
             update v_old -> v_new;
             returning cas_result;
@@ -443,7 +441,7 @@ fn free_block_mt(page: PagePtr, ptr: PPtr<u8>, Tracked(perm): Tracked<ptr::Point
                             dealloc.block_id(), mim_block_opt.tracked_borrow());
                     let pag: &Page = page.page_ptr.borrow(Tracked(&page_shared_access.points_to));
 
-                    let heap_ptr_int = my_atomic_with_ghost!(
+                    let heap_ptr_int = atomic_with_ghost!(
                         &pag.xheap.atomic => load();
                         ghost g =>
                     {
@@ -487,7 +485,7 @@ fn free_block_mt(page: PagePtr, ptr: PPtr<u8>, Tracked(perm): Tracked<ptr::Point
                     //pag.xthread_free.exit_delaying_state(Tracked(delay_actor_token));
 
                     // have to inline this bc of lifetimes
-                    my_atomic_with_ghost!(
+                    atomic_with_ghost!(
                         &pag.xthread_free.atomic => fetch_xor(3);
                         update v_old -> v_new;
                         ghost g => {

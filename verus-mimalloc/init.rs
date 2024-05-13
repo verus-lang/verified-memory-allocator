@@ -9,8 +9,6 @@ use vstd::modes::*;
 use vstd::set_lib::*;
 use vstd::cell::*;
 
-use crate::atomic_ghost_modified::*;
-
 use crate::tokens::{Mim, BlockId, DelayState, ThreadState, HeapState, HeapId, TldId, ThreadId};
 use crate::types::*;
 use crate::layout::*;
@@ -23,6 +21,7 @@ use crate::bin_sizes::*;
 use crate::page_organization::*;
 use crate::os_mem::*;
 use crate::thread::*;
+use crate::duplicable::Duplicable;
 
 verus!{
 

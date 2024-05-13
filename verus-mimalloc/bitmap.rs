@@ -5,7 +5,6 @@ use vstd::prelude::*;
 use vstd::ptr::*;
 use vstd::*;
 use vstd::set_lib::*;
-use crate::atomic_ghost_modified::*;
 
 verus!{
 

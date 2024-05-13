@@ -5,8 +5,6 @@ use vstd::ptr::*;
 use vstd::*;
 use vstd::modes::*;
 
-use crate::atomic_ghost_modified::*;
-
 use core::intrinsics::{likely, unlikely};
 
 use crate::tokens::{Mim, BlockId, DelayState};

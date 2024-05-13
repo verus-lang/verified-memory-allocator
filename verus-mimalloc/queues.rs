@@ -9,8 +9,6 @@ use vstd::modes::*;
 use vstd::set_lib::*;
 use vstd::pervasive::*;
 
-use crate::atomic_ghost_modified::*;
-
 use crate::tokens::{Mim, BlockId, DelayState, PageId, PageState};
 use crate::types::*;
 use crate::layout::*;

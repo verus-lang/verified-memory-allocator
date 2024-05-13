@@ -1,7 +1,6 @@
 use vstd::prelude::*;
 use vstd::assert_by_contradiction;
 use vstd::calc;
-use vstd::calc_internal;
 use vstd::std_specs::bits::u64_leading_zeros;
 use crate::config::*;
 

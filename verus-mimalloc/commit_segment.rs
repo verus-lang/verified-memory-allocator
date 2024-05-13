@@ -476,12 +476,12 @@ pub fn segment_delayed_decommit(
 
     let mut idx = 0;
     loop
-        invariant
+        invariant_except_break
             local.wf_main(),
             segment.wf(),
             segment.is_in(*local),
             0 <= idx < COMMIT_MASK_BITS,
-        invariant_ensures
+        invariant
             local.wf_main(),
             common_preserves(*old(local), *local),
             local.page_organization == old(local).page_organization,

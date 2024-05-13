@@ -8,8 +8,6 @@ use vstd::*;
 use vstd::modes::*;
 use vstd::set_lib::*;
 
-use crate::atomic_ghost_modified::*;
-
 use crate::tokens::{Mim, BlockId, DelayState, PageId};
 use crate::types::*;
 use crate::config::*;

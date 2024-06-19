@@ -672,6 +672,10 @@ pub open spec fn common_preserves(l1: Local, l2: Local) -> bool {
 }
 
 impl Local {
+    pub open spec fn inst(&self) -> Mim::Instance {
+        self.instance
+    }
+
     pub open spec fn wf(&self) -> bool {
         self.wf_main()
           && self.page_organization.popped == Popped::No
@@ -2206,8 +2210,8 @@ pub use used_page_get_mut_next_internal;
 
 #[verus::trusted]
 #[verifier::external_body]
-pub fn print_hex(s: StrSlice<'static>, u: usize) {
-    println!("{:} {:x}", s.into_rust_str(), u);
+pub fn print_hex(s: &'static str, u: usize) {
+    println!("{:} {:x}", s, u);
 }
 
 #[verus::trusted]

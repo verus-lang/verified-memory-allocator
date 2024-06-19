@@ -37,8 +37,8 @@ pub fn malloc_generic(
             dealloc@.wf()
               && points_to_raw@.is_range(ptr.id(), size as int)
               && ptr.id() == dealloc@.ptr()
-              && dealloc@.instance() == local.instance
-              && dealloc@.size == size
+              && dealloc@.inst() == local.instance
+              && dealloc@.size() == size
         }),
         common_preserves(*old(local), *local),
 

@@ -57,12 +57,12 @@ pub fn free(ptr: PPtr<u8>, Tracked(user_perm): Tracked<ptr::PointsToRaw>, Tracke
         old(local).wf(),
         ptr.id() != 0 ==> user_dealloc.is_some(),
         ptr.id() != 0 ==> user_dealloc.unwrap().wf(),
-        ptr.id() != 0 ==> user_perm.is_range(ptr.id(), user_dealloc.unwrap().size),
+        ptr.id() != 0 ==> user_perm.is_range(ptr.id(), user_dealloc.unwrap().size()),
         ptr.id() != 0 ==> ptr.id() == user_dealloc.unwrap().ptr(),
-        ptr.id() != 0 ==> old(local).instance == user_dealloc.unwrap().instance()
+        ptr.id() != 0 ==> old(local).inst() == user_dealloc.unwrap().inst()
     ensures
         local.wf(),
-        local.instance == old(local).instance,
+        local.inst() == old(local).inst(),
         forall |heap: HeapPtr| heap.is_in(*old(local)) ==> heap.is_in(*local),
 {
     if ptr.to_usize() == 0 {

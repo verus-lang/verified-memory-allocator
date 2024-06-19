@@ -35,7 +35,7 @@ pub fn heap_malloc(heap: HeapPtr, size: usize, Tracked(local): Tracked<&mut Loca
         heap.is_in(*old(local)), // $line_count$Trusted$
     ensures // $line_count$Trusted$
         local.wf(), // $line_count$Trusted$
-        local.instance == old(local).instance, // $line_count$Trusted$
+        local.inst() == old(local).inst(), // $line_count$Trusted$
         forall |heap: HeapPtr| heap.is_in(*old(local)) ==> heap.is_in(*local), // $line_count$Trusted$
         ({ // $line_count$Trusted$
             let (ptr, points_to_raw, dealloc) = t; // $line_count$Trusted$
@@ -43,8 +43,8 @@ pub fn heap_malloc(heap: HeapPtr, size: usize, Tracked(local): Tracked<&mut Loca
             dealloc@.wf() // $line_count$Trusted$
               && points_to_raw@.is_range(ptr.id(), size as int)  // $line_count$Trusted$
               && ptr.id() == dealloc@.ptr()  // $line_count$Trusted$
-              && dealloc@.instance() == local.instance  // $line_count$Trusted$
-              && dealloc@.size == size  // $line_count$Trusted$
+              && dealloc@.inst() == local.inst()  // $line_count$Trusted$
+              && dealloc@.size() == size  // $line_count$Trusted$
         })  // $line_count$Trusted$
 {
     heap_malloc_zero(heap, size, false, Tracked(&mut *local))
@@ -64,8 +64,8 @@ pub fn heap_malloc_zero(heap: HeapPtr, size: usize, zero: bool, Tracked(local): 
             dealloc@.wf()
               && points_to_raw@.is_range(ptr.id(), size as int)
               && ptr.id() == dealloc@.ptr()
-              && dealloc@.instance() == local.instance
-              && dealloc@.size == size
+              && dealloc@.inst() == local.inst()
+              && dealloc@.size() == size
         }),
         common_preserves(*old(local), *local),
 {
@@ -86,8 +86,8 @@ pub fn heap_malloc_zero_ex(heap: HeapPtr, size: usize, zero: bool, huge_alignmen
             dealloc@.wf()
               && points_to_raw@.is_range(ptr.id(), size as int)
               && ptr.id() == dealloc@.ptr()
-              && dealloc@.instance() == local.instance
-              && dealloc@.size == size
+              && dealloc@.inst() == local.instance
+              && dealloc@.size() == size
         }),
         common_preserves(*old(local), *local),
 {
@@ -146,8 +146,8 @@ pub fn heap_malloc_small_zero(
             dealloc@.wf()
               && points_to_raw@.is_range(ptr.id(), size as int)
               && ptr.id() == dealloc@.ptr()
-              && dealloc@.instance() == local.instance
-              && dealloc@.size == size
+              && dealloc@.inst() == local.instance
+              && dealloc@.size() == size
         }),
         common_preserves(*old(local), *local),
 {
@@ -200,8 +200,8 @@ pub fn page_malloc(
             dealloc@.wf()
               && points_to_raw@.is_range(ptr.id(), size as int)
               && ptr.id() == dealloc@.ptr()
-              && dealloc@.instance() == local.instance
-              && dealloc@.size == size
+              && dealloc@.inst() == local.instance
+              && dealloc@.size() == size
         }),
         common_preserves(*old(local), *local),
 {

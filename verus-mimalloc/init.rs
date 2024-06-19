@@ -35,13 +35,19 @@ impl Global {
         self.my_inst@.instance == self.instance
         && self.my_inst@.value == self.instance
     }
+
+    pub open spec fn wf_right_to_use_thread(&self, right: RightToUseThread, tid: ThreadId) -> bool {
+        right@.instance == self.instance && right@.key == tid
+    }
+
+    pub open spec fn inst(&self) -> MimInst {
+        self.instance
+    }
 }
 
 type RightToUseThread = Mim::right_to_use_thread;
+type MimInst = Mim::Instance;
 
-pub open spec fn wf_right_to_use_thread(global: Global, right: RightToUseThread, tid: ThreadId) -> bool {
-    right@.instance == global.instance && right@.key == tid
-}
 
 /*
 impl RightToUseThread {
@@ -55,7 +61,7 @@ pub proof fn global_init() -> (tracked res: (Global, Map<ThreadId, Mim::right_to
     ensures // $line_count$Trusted$
         res.0.wf(), // $line_count$Trusted$
         forall |tid: ThreadId| #[trigger] res.1.dom().contains(tid) // $line_count$Trusted$
-          && wf_right_to_use_thread(res.0, res.1[tid], tid) // $line_count$Trusted$
+          && res.0.wf_right_to_use_thread(res.1[tid], tid) // $line_count$Trusted$
 {
     let tracked (Tracked(instance), Tracked(right_to_set_inst), _, _, Tracked(rights), _, _, _, _, _, _, _, _) = Mim::Instance::initialize(
         Map::tracked_empty(), Map::tracked_empty(), Map::tracked_empty(),
@@ -68,12 +74,13 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
       Tracked(right): Tracked<Mim::right_to_use_thread>, // $line_count$Trusted$
       Tracked(cur_thread): Tracked<IsThread> // $line_count$Trusted$
 ) -> (res: (HeapPtr, Tracked<Option<Local>>)) // $line_count$Trusted$
-    requires wf_right_to_use_thread(global, right, cur_thread@), // $line_count$Trusted$
+    requires global.wf_right_to_use_thread(right, cur_thread@), // $line_count$Trusted$
         global.wf(), // $line_count$Trusted$
     ensures ({ let (heap, local_opt) = res; { // $line_count$Trusted$
         heap.heap_ptr.id() != 0 ==> // $line_count$Trusted$
             local_opt@.is_some() // $line_count$Trusted$
             && local_opt@.unwrap().wf() // $line_count$Trusted$
+            && local_opt@.unwrap().inst() == global.inst() // $line_count$Trusted$
             && heap.wf() // $line_count$Trusted$
             && heap.is_in(local_opt@.unwrap()) // $line_count$Trusted$
     }}) // $line_count$Trusted$

@@ -110,6 +110,5 @@ Not supported:
 ### Memory allocators in this directory
 
  * `verus-mimalloc` - Verus memory allocator based on [mimalloc](https://github.com/microsoft/mimalloc). (This is what you're here for.)
- * `verus-bitmap-allocator` - Verus implementation of a simple bitmap-based allocator. Probably really slow. [Incomplete, not maintained]
  * `rust-jemalloc-wrapper` - Rust wrapper around jemalloc. Mostly used as a control for testing the benchmark script.
 

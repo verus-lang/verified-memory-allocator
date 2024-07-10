@@ -36,3 +36,9 @@ print("\\newcommand{\\allocatorExec}{%d}" % total_exec)
 print("\\newcommand{\\allocatorProof}{%d}" % total_spec_proof)
 print("\\newcommand{\\allocatorProofToCodeRatio}{%.1f}" % (total_spec_proof / total_exec))
 print("\\newcommand{\\allocatorTotal}{%d}" % total_total)
+
+a = j["files"]["tokens.rs"]["proof"] + j["files"]["tokens.rs"]["spec"]
+b = j["files"]["page_organization.rs"]["proof"] + j["files"]["page_organization.rs"]["spec"]
+print("\\newcommand{\\allocatorMimProof}{%d}" % a)
+print("\\newcommand{\\allocatorPageOrgProof}{%d}" % b)
+print("\\newcommand{\\allocatorProofMinus}{%d}" % (total_spec_proof - a - b))

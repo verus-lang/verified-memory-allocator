@@ -1573,7 +1573,7 @@ impl ThreadLLSimple {
         }
 
         let tracked ll: LL;
-        let p = core::ptr::null_mut();
+        let p = core::ptr::null_mut::<Node>();
         let res = atomic_with_ghost!(
             &self.atomic => swap(core::ptr::null_mut());
             ghost g => {
@@ -1755,7 +1755,7 @@ impl ThreadLLWithDelayBits {
             self.page_id() == page_id,
             self.instance == instance,
     {
-        let p = core::ptr::null_mut();
+        let p = core::ptr::null_mut::<Node>();
         let ghost data = LLData {
             fixed_page: true, block_size, page_id, instance, len: 0, heap_id: None,
         };
@@ -1993,7 +1993,7 @@ impl ThreadLLWithDelayBits {
             ll.fixed_page(),
     {
         let tracked ll: LL;
-        let p = core::ptr::null_mut();
+        let p = core::ptr::null_mut::<Node>();
         let res = atomic_with_ghost!(
             &self.atomic => fetch_and(3);
             update old_v -> new_v;

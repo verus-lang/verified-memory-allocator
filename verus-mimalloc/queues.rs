@@ -104,7 +104,7 @@ pub fn page_queue_remove(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(local)
     let ghost local_snap = *local;
 
     if prev.addr() == 0 {
-        heap_queue_first_update(heap, pq, Tracked(&mut *local), Ghost(old_val as int));
+        heap_queue_first_update(heap, pq, Tracked(&mut *local), Ghost(old_val));
     }
 
     let c = heap.get_page_count(Tracked(&*local));
@@ -128,9 +128,9 @@ pub fn page_queue_remove(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(local)
             let j = pfd_upper(pq as int) as int + 1;
             assert forall |wsize| 0 <= wsize < pfd.len() implies
                 pages_free_direct_match(
-                    (#[trigger] pfd[wsize]) as int,
-                    pages[smallest_bin_fitting_size(wsize * INTPTR_SIZE)].first as int,
-                    emp as int)
+                    (#[trigger] pfd[wsize]),
+                    pages[smallest_bin_fitting_size(wsize * INTPTR_SIZE)].first,
+                    emp)
             by {
                 if i <= wsize < j {
                     idx_in_range_has_bin_size(pq as int, wsize);
@@ -161,7 +161,7 @@ pub fn page_queue_remove(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(local)
 
             let pfd = local.heap.pages_free_direct@.value.unwrap()@;
             let pages = local.heap.pages@.value.unwrap()@;
-            let emp = local.page_empty_global@.s.points_to.ptr() as int;
+            let emp = local.page_empty_global@.s.points_to.ptr();
 
             //assert(pfd == old_pfd);
             //assert(pages == old_pages);
@@ -169,9 +169,9 @@ pub fn page_queue_remove(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(local)
 
             assert forall |wsize| 0 <= wsize < pfd.len() implies
                 pages_free_direct_match(
-                    (#[trigger] pfd[wsize]) as int,
-                    pages[smallest_bin_fitting_size(wsize * INTPTR_SIZE)].first as int,
-                    emp as int)
+                    (#[trigger] pfd[wsize]),
+                    pages[smallest_bin_fitting_size(wsize * INTPTR_SIZE)].first,
+                    emp)
             by {
                 //let snap_pages = local_snap.heap.pages@.value.unwrap()@;
                 //let snap_pages1 = local_snap1.heap.pages@.value.unwrap()@;
@@ -309,7 +309,7 @@ pub fn page_queue_push(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(local): 
     }
     let ghost local_snap = *local;
 
-    heap_queue_first_update(heap, pq, Tracked(&mut *local), Ghost(first_in_queue as int));
+    heap_queue_first_update(heap, pq, Tracked(&mut *local), Ghost(first_in_queue));
 
     let c = heap.get_page_count(Tracked(&*local));
     heap.set_page_count(Tracked(&mut *local), c.wrapping_add(1));
@@ -319,13 +319,13 @@ pub fn page_queue_push(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(local): 
             let opfd = local_snap.heap.pages_free_direct@.value.unwrap()@;
             let pfd = local.heap.pages_free_direct@.value.unwrap()@;
             let pages = local.heap.pages@.value.unwrap()@;
-            let emp = local.page_empty_global@.s.points_to.ptr() as int;
+            let emp = local.page_empty_global@.s.points_to.ptr();
             let i = pfd_lower(pq as int) as int;
             let j = pfd_upper(pq as int) as int + 1;
             assert forall |wsize| 0 <= wsize < pfd.len() implies
                 pages_free_direct_match(
-                    (#[trigger] pfd[wsize]) as int,
-                    pages[smallest_bin_fitting_size(wsize * INTPTR_SIZE)].first as int,
+                    (#[trigger] pfd[wsize]),
+                    pages[smallest_bin_fitting_size(wsize * INTPTR_SIZE)].first,
                     emp)
             by {
                 if i <= wsize < j {
@@ -358,7 +358,7 @@ pub fn page_queue_push(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(local): 
 
             let pfd = local.heap.pages_free_direct@.value.unwrap()@;
             let pages = local.heap.pages@.value.unwrap()@;
-            let emp = local.page_empty_global@.s.points_to.ptr() as int;
+            let emp = local.page_empty_global@.s.points_to.ptr();
 
             //assert(pfd == old_pfd);
             //assert(pages == old_pages);
@@ -366,8 +366,8 @@ pub fn page_queue_push(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(local): 
 
             assert forall |wsize| 0 <= wsize < pfd.len() implies
                 pages_free_direct_match(
-                    (#[trigger] pfd[wsize]) as int,
-                    pages[smallest_bin_fitting_size(wsize * INTPTR_SIZE)].first as int,
+                    (#[trigger] pfd[wsize]),
+                    pages[smallest_bin_fitting_size(wsize * INTPTR_SIZE)].first,
                     emp)
             by {
                 //let snap_pages = local_snap.heap.pages@.value.unwrap()@;
@@ -481,7 +481,7 @@ pub fn page_queue_push_back(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(loc
     let ghost local_snap = *local;
 
     if last_in_queue.addr() == 0 {
-        heap_queue_first_update(heap, pq, Tracked(&mut *local), Ghost(0));
+        heap_queue_first_update(heap, pq, Tracked(&mut *local), Ghost(core::ptr::null_mut()));
     }
 
     let c = heap.get_page_count(Tracked(&*local));
@@ -493,13 +493,13 @@ pub fn page_queue_push_back(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(loc
                 let opfd = local_snap.heap.pages_free_direct@.value.unwrap()@;
                 let pfd = local.heap.pages_free_direct@.value.unwrap()@;
                 let pages = local.heap.pages@.value.unwrap()@;
-                let emp = local.page_empty_global@.s.points_to.ptr() as int;
+                let emp = local.page_empty_global@.s.points_to.ptr();
                 let i = pfd_lower(pq as int) as int;
                 let j = pfd_upper(pq as int) as int + 1;
                 assert forall |wsize| 0 <= wsize < pfd.len() implies
                     pages_free_direct_match(
-                        (#[trigger] pfd[wsize]) as int,
-                        pages[smallest_bin_fitting_size(wsize * INTPTR_SIZE)].first as int,
+                        (#[trigger] pfd[wsize]),
+                        pages[smallest_bin_fitting_size(wsize * INTPTR_SIZE)].first,
                         emp)
                 by {
                     if i <= wsize < j {
@@ -532,7 +532,7 @@ pub fn page_queue_push_back(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(loc
 
                 let pfd = local.heap.pages_free_direct@.value.unwrap()@;
                 let pages = local.heap.pages@.value.unwrap()@;
-                let emp = local.page_empty_global@.s.points_to.ptr() as int;
+                let emp = local.page_empty_global@.s.points_to.ptr();
 
                 //assert(pfd == old_pfd);
                 //assert(pages == old_pages);
@@ -540,8 +540,8 @@ pub fn page_queue_push_back(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(loc
 
                 assert forall |wsize| 0 <= wsize < pfd.len() implies
                     pages_free_direct_match(
-                        (#[trigger] pfd[wsize]) as int,
-                        pages[smallest_bin_fitting_size(wsize * INTPTR_SIZE)].first as int,
+                        (#[trigger] pfd[wsize]),
+                        pages[smallest_bin_fitting_size(wsize * INTPTR_SIZE)].first,
                         emp)
                 by {
                     //let snap_pages = local_snap.heap.pages@.value.unwrap()@;
@@ -567,11 +567,11 @@ pub fn page_queue_push_back(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(loc
         } else {
             let pfd = local.heap.pages_free_direct@.value.unwrap()@;
             let pages = local.heap.pages@.value.unwrap()@;
-            let emp = local.page_empty_global@.s.points_to.ptr() as int;
+            let emp = local.page_empty_global@.s.points_to.ptr();
             assert forall |wsize| 0 <= wsize < pfd.len() implies
                     pages_free_direct_match(
-                        (#[trigger] pfd[wsize]) as int,
-                        pages[smallest_bin_fitting_size(wsize * INTPTR_SIZE)].first as int,
+                        (#[trigger] pfd[wsize]),
+                        pages[smallest_bin_fitting_size(wsize * INTPTR_SIZE)].first,
                         emp)
             by {
                 bounds_for_smallest_bin_fitting_size(wsize * INTPTR_SIZE);
@@ -597,11 +597,11 @@ spec fn local_direct_update(loc1: Local, loc2: Local, i: int, j: int, pq: int) -
     &&& pfd_direct_update(
           loc1.heap.pages_free_direct@.value.unwrap()@,
           loc2.heap.pages_free_direct@.value.unwrap()@, i, j,
-            loc1.page_empty_global@.s.points_to.ptr() as int,
-            loc1.heap.pages@.value.unwrap()@[pq].first as int)
+            loc1.page_empty_global@.s.points_to.ptr(),
+            loc1.heap.pages@.value.unwrap()@[pq].first)
 }
 
-spec fn pfd_direct_update(pfd1: Seq<*mut Page>, pfd2: Seq<*mut Page>, i: int, j: int, emp: int, p: int) -> bool {
+spec fn pfd_direct_update(pfd1: Seq<*mut Page>, pfd2: Seq<*mut Page>, i: int, j: int, emp: *mut Page, p: *mut Page) -> bool {
     &&& pfd1.len() == pfd2.len() == PAGES_DIRECT
     &&& (forall |k|
         #![trigger(pfd1.index(k))]
@@ -609,7 +609,7 @@ spec fn pfd_direct_update(pfd1: Seq<*mut Page>, pfd2: Seq<*mut Page>, i: int, j:
       0 <= k < pfd1.len() && !(i <= k < j) ==> pfd1[k] == pfd2[k])
     &&& (forall |k| #![trigger pfd2.index(k)]
         0 <= k < pfd2.len() && i <= k < j ==>
-            pages_free_direct_match(pfd2[k] as int, p, emp))
+            pages_free_direct_match(pfd2[k], p, emp))
 }
 
 proof fn holds_on_present_value(local: Local, pq: int)
@@ -619,18 +619,18 @@ proof fn holds_on_present_value(local: Local, pq: int)
         pq != BIN_FULL ==> (forall |k: int| k < PAGES_DIRECT &&
             pfd_lower(pq as int) <= k <= pfd_upper(pq as int) ==>
                 pages_free_direct_match(
-                    #[trigger] local.heap.pages_free_direct@.value.unwrap()@[k] as int,
-                    local.heap.pages@.value.unwrap()@[pq].first as int,
-                    local.page_empty_global@.s.points_to.ptr() as int)
+                    #[trigger] local.heap.pages_free_direct@.value.unwrap()@[k],
+                    local.heap.pages@.value.unwrap()@[pq].first,
+                    local.page_empty_global@.s.points_to.ptr())
         )
 {
     if pq != BIN_FULL {
         assert forall |k: int| k < PAGES_DIRECT &&
             pfd_lower(pq as int) <= k <= pfd_upper(pq as int) implies
                 pages_free_direct_match(
-                    #[trigger] local.heap.pages_free_direct@.value.unwrap()@[k] as int,
-                    local.heap.pages@.value.unwrap()@[pq].first as int,
-                    local.page_empty_global@.s.points_to.ptr() as int)
+                    #[trigger] local.heap.pages_free_direct@.value.unwrap()@[k],
+                    local.heap.pages@.value.unwrap()@[pq].first,
+                    local.page_empty_global@.s.points_to.ptr())
         by {
             //assert(0 <= k < local.heap.pages_free_direct@.value.unwrap()@.len());
             idx_in_range_has_bin_size(pq as int, k as int);
@@ -638,7 +638,7 @@ proof fn holds_on_present_value(local: Local, pq: int)
     }
 }
 
-fn heap_queue_first_update(heap: HeapPtr, pq: usize, Tracked(local): Tracked<&mut Local>, Ghost(old_p): Ghost<int>)
+fn heap_queue_first_update(heap: HeapPtr, pq: usize, Tracked(local): Tracked<&mut Local>, Ghost(old_p): Ghost<*mut Page>)
     requires
         old(local).wf_basic(),
         heap.wf(),
@@ -647,8 +647,8 @@ fn heap_queue_first_update(heap: HeapPtr, pq: usize, Tracked(local): Tracked<&mu
         pq != BIN_FULL ==> (forall |k: int| k < PAGES_DIRECT &&
             pfd_lower(pq as int) <= k <= pfd_upper(pq as int) ==>
                 pages_free_direct_match(
-                    #[trigger] old(local).heap.pages_free_direct@.value.unwrap()@[k] as int,
-                    old_p, old(local).page_empty_global@.s.points_to.ptr() as int)
+                    #[trigger] old(local).heap.pages_free_direct@.value.unwrap()@[k],
+                    old_p, old(local).page_empty_global@.s.points_to.ptr())
         ),
     ensures
         pq == BIN_FULL ==> *local == *old(local),
@@ -771,9 +771,9 @@ fn heap_queue_first_update(heap: HeapPtr, pq: usize, Tracked(local): Tracked<&mu
             idx < PAGES_DIRECT,
             local_direct_update(*old(local), *local, start as int, sz as int, pq as int),
             page_ptr as int != 0,
-            pages_free_direct_match(page_ptr as int, 
-                old(local).heap.pages@.value.unwrap()@[pq as int].first as int,
-                local.page_empty_global@.s.points_to.ptr() as int),
+            pages_free_direct_match(page_ptr, 
+                old(local).heap.pages@.value.unwrap()@[pq as int].first,
+                local.page_empty_global@.s.points_to.ptr()),
     {
         let ghost prev_local = *local;
         heap_get_pages_free_direct!(heap, local, pages_free_direct => {

@@ -541,33 +541,32 @@ impl HeapSharedAccess {
     }
 }
 
-pub open spec fn pages_free_direct_match(pfd_val: int, p_val: int, emp: int) -> bool {
-    (p_val == 0 ==> pfd_val == emp)
-    && (p_val != 0 ==> pfd_val == p_val)
+pub open spec fn pages_free_direct_match(pfd_val: *mut Page, p_val: *mut Page, emp: *mut Page) -> bool {
+    (p_val as int == 0 ==> pfd_val == emp)
+    && (p_val as int != 0 ==> pfd_val == p_val)
 }
 
-pub open spec fn pages_free_direct_is_correct(pfd: Seq<*mut Page>, pages: Seq<PageQueue>, emp: int) -> bool {
+pub open spec fn pages_free_direct_is_correct(pfd: Seq<*mut Page>, pages: Seq<PageQueue>, emp: *mut Page) -> bool {
     &&& pfd.len() == PAGES_DIRECT
     &&& pages.len() == BIN_FULL + 1
     &&& (forall |wsize|
       0 <= wsize < pfd.len() ==>
         pages_free_direct_match(
-            (#[trigger] pfd[wsize]).addr() as int,
-            pages[smallest_bin_fitting_size(wsize * INTPTR_SIZE)].first.addr() as int,
+            #[trigger] pfd[wsize],
+            pages[smallest_bin_fitting_size(wsize * INTPTR_SIZE)].first,
             emp)
     )
 }
 
 impl HeapLocalAccess {
-    pub open spec fn wf(&self, heap_id: HeapId, heap_state: HeapState, tld_id: TldId, mim_instance: Mim::Instance, emp: int) -> bool {
+    pub open spec fn wf(&self, heap_id: HeapId, heap_state: HeapState, tld_id: TldId, mim_instance: Mim::Instance, emp: *mut Page) -> bool {
 
         self.wf_basic(heap_id, heap_state, tld_id, mim_instance)
           && pages_free_direct_is_correct(
                 self.pages_free_direct@.value.unwrap()@,
                 self.pages@.value.unwrap()@,
-                emp,
-                )
-          && heap_state.shared_access.points_to.value().page_empty_ptr.addr() == emp
+                emp)
+          && heap_state.shared_access.points_to.value().page_empty_ptr == emp
     }
 
     pub open spec fn wf_basic(&self, heap_id: HeapId, heap_state: HeapState, tld_id: TldId, mim_instance: Mim::Instance) -> bool {
@@ -716,7 +715,7 @@ impl Local {
         &&& self.thread_token@.value.segments.dom() == self.segments.dom()
 
         &&& self.thread_token@.value.heap_id == self.heap_id
-        &&& self.heap.wf(self.heap_id, self.thread_token@.value.heap, self.tld_id, self.instance, self.page_empty_global@.s.points_to.ptr() as int)
+        &&& self.heap.wf(self.heap_id, self.thread_token@.value.heap, self.tld_id, self.instance, self.page_empty_global@.s.points_to.ptr())
 
         &&& (forall |page_id|
             #[trigger] self.pages.dom().contains(page_id) ==>

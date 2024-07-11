@@ -74,6 +74,7 @@ impl MimDeallocInner {
         requires
             self.wf(),
             points_to_raw.is_range(self.ptr as int, self.block_id().block_size as int),
+            points_to_raw.provenance() == self.ptr@.provenance,
             0 <= sz <= self.block_id().block_size,
         ensures ({
             let (md, points_to_raw) = res;
@@ -116,6 +117,7 @@ impl MimDealloc {
           && self._size >= 0
           && self.padding.is_range(self.inner.ptr as int + self._size,
               self.block_id().block_size - self._size)
+          && self.padding.provenance() == self.inner.ptr@.provenance
     }
 
     pub proof fn into_internal(tracked self, tracked points_to_raw: PointsToRaw)
@@ -123,7 +125,8 @@ impl MimDealloc {
 
         requires
             self.wf(),
-            points_to_raw.is_range(self.ptr() as int, self._size)
+            points_to_raw.is_range(self.ptr() as int, self._size),
+            points_to_raw.provenance() == self.ptr()@.provenance
         ensures ({
             let (md, points_to_raw_full) = res;
             md.wf()

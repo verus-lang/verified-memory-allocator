@@ -247,9 +247,9 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
         assert forall |wsize|
           0 <= wsize < pfd.len() implies
             pages_free_direct_match(
-                (#[trigger] pfd[wsize]) as int,
-                pages[smallest_bin_fitting_size(wsize * INTPTR_SIZE)].first as int,
-                emp as int)
+                (#[trigger] pfd[wsize]),
+                pages[smallest_bin_fitting_size(wsize * INTPTR_SIZE)].first,
+                emp)
         by {
             bounds_for_smallest_bin_fitting_size(wsize * INTPTR_SIZE);
             //assert(0 <= smallest_bin_fitting_size(wsize * INTPTR_SIZE));
@@ -259,9 +259,9 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
         assert(pages_free_direct_is_correct(
             local.heap.pages_free_direct@.value.unwrap()@,
             local.heap.pages@.value.unwrap()@,
-            emp as int));
+            emp));
         assert(local.heap.wf_basic(local.heap_id, local.thread_token@.value.heap, local.tld_id, local.instance));
-        assert(local.heap.wf(local.heap_id, local.thread_token@.value.heap, local.tld_id, local.instance, local.page_empty_global@.s.points_to.ptr() as int));
+        assert(local.heap.wf(local.heap_id, local.thread_token@.value.heap, local.tld_id, local.instance, local.page_empty_global@.s.points_to.ptr()));
         assert(local.wf_main());
         assert(local.wf());
     }

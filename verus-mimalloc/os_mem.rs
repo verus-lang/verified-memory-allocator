@@ -133,6 +133,8 @@ pub fn mmap_prot_none(hint: *mut u8, len: usize) -> (pt: (*mut u8, Tracked<MemCh
         pt.0.addr() != MAP_FAILED ==> pt.1@.os_exact_range(pt.0 as int, len as int),
         pt.0.addr() != MAP_FAILED ==> pt.1@.os_has_range_no_read_write(pt.0 as int, len as int),
         pt.0.addr() != MAP_FAILED ==> pt.0.addr() + len < usize::MAX,
+        pt.0.addr() != MAP_FAILED ==> pt.0@.provenance == pt.1@.points_to.provenance(),
+        pt.0.addr() != MAP_FAILED ==> pt.0@.metadata == Metadata::Thin,
 {
     let p = _mmap_prot_none(hint as *mut libc::c_void, len);
     let p = if p == libc::MAP_FAILED { MAP_FAILED as *mut u8 } else { p as *mut u8 };
@@ -152,6 +154,8 @@ pub fn mmap_prot_read_write(hint: *mut u8, len: usize) -> (pt: (*mut u8, Tracked
         pt.0.addr() != MAP_FAILED ==> pt.1@.has_pointsto_for_all_read_write(),
         pt.0.addr() != MAP_FAILED ==> pt.0.addr() + len < usize::MAX,
         pt.0.addr() != MAP_FAILED ==> pt.0 as int % page_size() == 0,
+        pt.0.addr() != MAP_FAILED ==> pt.0@.provenance == pt.1@.points_to.provenance(),
+        pt.0.addr() != MAP_FAILED ==> pt.0@.metadata == Metadata::Thin,
 {
     let p = _mmap_prot_read_write(hint as *mut libc::c_void, len);
     let p = if p == libc::MAP_FAILED { MAP_FAILED as *mut u8 } else { p as *mut u8 };

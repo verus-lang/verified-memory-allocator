@@ -5,6 +5,7 @@
 #![allow(unused_assignments)]
 #![allow(unused_macros)]
 #![feature(thread_id_value)]
+#![feature(strict_provenance)]
 
 // bottom bread
 
@@ -61,20 +62,20 @@ fn main() {
     let tracked right = rights.tracked_remove(is_thread@);
     let (heap, Tracked(local)) = init::heap_init(Tracked(global), Tracked(right), Tracked(is_thread));
 
-    if heap.heap_ptr.to_usize() != 0 {
+    if heap.heap_ptr.addr() != 0 {
         let tracked mut local = local.tracked_unwrap();
 
         let (p1, u1, Tracked(d1)) = crate::alloc_fast::heap_malloc(heap, 24, Tracked(&mut local));
-        print_hex(vstd::string::new_strlit("allocated: "), p1.to_usize());
+        print_hex(vstd::string::new_strlit("allocated: "), p1.addr());
 
         let (p2, u2, Tracked(d2)) = crate::alloc_fast::heap_malloc(heap, 24, Tracked(&mut local));
-        print_hex(vstd::string::new_strlit("allocated: "), p2.to_usize());
+        print_hex(vstd::string::new_strlit("allocated: "), p2.addr());
 
         let (p3, u3, Tracked(d3)) = crate::alloc_fast::heap_malloc(heap, 24, Tracked(&mut local));
-        print_hex(vstd::string::new_strlit("allocated: "), p3.to_usize());
+        print_hex(vstd::string::new_strlit("allocated: "), p3.addr());
 
         let (p4, u4, Tracked(d4)) = crate::alloc_fast::heap_malloc(heap, 24, Tracked(&mut local));
-        print_hex(vstd::string::new_strlit("allocated: "), p4.to_usize());
+        print_hex(vstd::string::new_strlit("allocated: "), p4.addr());
 
         crate::free::free(p1, u1, Tracked(Some(d1)), Tracked(&mut local));
         crate::free::free(p2, u2, Tracked(Some(d2)), Tracked(&mut local));
@@ -82,7 +83,7 @@ fn main() {
         crate::free::free(p4, u4, Tracked(Some(d4)), Tracked(&mut local));
 
         let (p5, u5, Tracked(d5)) = crate::alloc_fast::heap_malloc(heap, 24, Tracked(&mut local));
-        print_hex(vstd::string::new_strlit("allocated: "), p5.to_usize());
+        print_hex(vstd::string::new_strlit("allocated: "), p5.addr());
 
         crate::free::free(p5, u5, Tracked(Some(d5)), Tracked(&mut local));
     }
@@ -131,24 +132,24 @@ pub unsafe extern "C" fn verus_mi_thread_init_default_heap() -> *mut c_void {
     //  - check that the thread ID is unused
 
     let (heap, _) = crate::init::heap_init(Tracked::assume_new(), Tracked::assume_new(), Tracked::assume_new());
-    heap.heap_ptr.uptr as *mut c_void
+    heap.heap_ptr as *mut c_void
 }
 
 #[verifier::external]
 #[no_mangle]
 pub unsafe extern "C" fn verus_mi_heap_malloc(heap: *mut c_void, size: usize) -> *mut c_void {
     let heap = crate::types::HeapPtr {
-        heap_ptr: vstd::ptr::PPtr { uptr: heap as *mut crate::types::Heap },
+        heap_ptr: heap as *mut crate::types::Heap,
         heap_id: Ghost::assume_new(),
     };
     let (p, _, _) = crate::alloc_fast::heap_malloc(heap, size, Tracked::assume_new());
-    p.uptr as *mut c_void
+    p as *mut c_void
 }
 
 #[verifier::external]
 #[no_mangle]
 pub unsafe extern "C" fn verus_mi_free(ptr: *mut c_void) {
-    let p = vstd::ptr::PPtr { uptr: ptr as *mut u8 };
+    let p = ptr as *mut u8;
     crate::free::free(p, Tracked::assume_new(), Tracked::assume_new(), Tracked::assume_new());
 }
 

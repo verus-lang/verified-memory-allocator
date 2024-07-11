@@ -14,12 +14,12 @@ pub fn os_alloc_aligned_offset(
     offset: usize,
     request_commit: bool,
     allow_large: bool,
-) -> (res: (usize, bool, Tracked<MemChunk>))
+) -> (res: (*mut u8, bool, Tracked<MemChunk>))
     requires alignment + page_size() <= usize::MAX,
         size as int % page_size() == 0,
         size == SEGMENT_SIZE,
         alignment as int % page_size() == 0,
-    ensures ({ let (addr, is_large, mem) = res;
+    ensures ({ let (addr, is_large, mem) = res; let addr = addr as int;
         addr != 0 ==> (
             mem@.wf()
             && mem@.os_has_range(addr as int, size as int)
@@ -32,7 +32,7 @@ pub fn os_alloc_aligned_offset(
     })
 {
     if offset > SEGMENT_SIZE as usize {
-        return (0, allow_large, Tracked(MemChunk::empty()));
+        return (core::ptr::null_mut(), allow_large, Tracked(MemChunk::empty()));
     }
 
     if offset == 0 {
@@ -98,7 +98,7 @@ pub fn os_alloc_aligned(
     alignment: usize,
     request_commit: bool,
     allow_large: bool
-) -> (res: (usize, bool, Tracked<MemChunk>))
+) -> (res: (*mut u8, bool, Tracked<MemChunk>))
     requires
         alignment + page_size() <= usize::MAX,
         size == SEGMENT_SIZE,
@@ -108,16 +108,16 @@ pub fn os_alloc_aligned(
         addr != 0 ==> (
             mem@.wf()
             && mem@.os_has_range(addr as int, size as int)
-            && addr + size <= usize::MAX
+            && addr as int + size <= usize::MAX
             && (request_commit ==> mem@.os_has_range_read_write(addr as int, size as int))
             && (request_commit ==> mem@.pointsto_has_range(addr as int, size as int))
             && (!request_commit ==> mem@.os_has_range_no_read_write(addr as int, size as int))
-            && (alignment != 0 ==> addr % alignment == 0)
+            && (alignment != 0 ==> addr as int % alignment as int == 0)
         )
     })
 {
     if size == 0 {
-        return (0, allow_large, Tracked(MemChunk::empty()));
+        return (core::ptr::null_mut(), allow_large, Tracked(MemChunk::empty()));
     }
     let size1 = os_good_alloc_size(size);
     let alignment1 = align_up(alignment, get_page_size());
@@ -134,7 +134,7 @@ pub fn os_mem_alloc_aligned(
     alignment: usize,
     request_commit: bool,
     allow_large: bool,
-) -> (res: (usize, bool, Tracked<MemChunk>))
+) -> (res: (*mut u8, bool, Tracked<MemChunk>))
     requires
         size as int % page_size() == 0,
         size <= SEGMENT_SIZE,
@@ -143,11 +143,11 @@ pub fn os_mem_alloc_aligned(
         addr != 0 ==> (
             mem@.wf()
             && mem@.os_exact_range(addr as int, size as int)
-            && addr + size <= usize::MAX
+            && addr as int + size <= usize::MAX
             && (request_commit ==> mem@.os_has_range_read_write(addr as int, size as int))
             && (request_commit ==> mem@.pointsto_has_range(addr as int, size as int))
             && (!request_commit ==> mem@.os_has_range_no_read_write(addr as int, size as int))
-            && (alignment != 0 ==> addr % alignment == 0)
+            && (alignment != 0 ==> addr as int % alignment as int == 0)
         )
     })
 {
@@ -157,15 +157,15 @@ pub fn os_mem_alloc_aligned(
     }
 
     if (!(alignment >= get_page_size() && ((alignment & (alignment - 1)) == 0))) {
-        return (0, allow_large, Tracked(MemChunk::empty()));
+        return (core::ptr::null_mut(), allow_large, Tracked(MemChunk::empty()));
     }
 
     let (p, is_large, Tracked(mem)) = os_mem_alloc(size, alignment, request_commit, allow_large);
-    if p == 0 {
+    if p.addr() == 0 {
         return (p, is_large, Tracked(mem));
     }
 
-    if p % alignment != 0 {
+    if p.addr() % alignment != 0 {
         todo();
     }
 
@@ -177,12 +177,12 @@ fn os_mem_alloc(
     try_alignment: usize,
     request_commit: bool,
     allow_large: bool,
-) -> (res: (usize, bool, Tracked<MemChunk>))
+) -> (res: (*mut u8, bool, Tracked<MemChunk>))
     requires
         size as int % page_size() == 0,
         size <= SEGMENT_SIZE,
         try_alignment == 1 || try_alignment as int % page_size() == 0,
-    ensures ({ let (addr, is_large, mem) = res;
+    ensures ({ let (addr, is_large, mem) = res; let addr = addr.addr();
         addr != 0 ==> (
             mem@.wf()
             && addr + size <= usize::MAX
@@ -194,7 +194,7 @@ fn os_mem_alloc(
     })
 {
     if size == 0 { 
-        return (0, allow_large, Tracked(MemChunk::empty()));
+        return (core::ptr::null_mut(), allow_large, Tracked(MemChunk::empty()));
     }
 
     let mut allow_large = allow_large;
@@ -219,13 +219,13 @@ fn unix_mmap(
     prot_rw: bool,
     large_only: bool,
     allow_large: bool,
-) -> (res: (usize, bool, Tracked<MemChunk>))
+) -> (res: (*mut u8, bool, Tracked<MemChunk>))
     requires
         addr as int % page_size() == 0,
         size as int % page_size() == 0,
         size <= SEGMENT_SIZE,
         try_alignment == 1 || try_alignment as int % page_size() == 0,
-    ensures ({ let (addr, is_large, mem) = res;
+    ensures ({ let (addr, is_large, mem) = res; let addr = addr.addr();
         addr != 0 ==> (
             mem@.wf()
             && mem@.os_exact_range(addr as int, size as int)
@@ -243,7 +243,7 @@ fn unix_mmap(
 
     let is_large = false;
     let (p, Tracked(mem)) = unix_mmapx(addr, size, try_alignment, prot_rw);
-    if p != 0 {
+    if p.addr() != 0 {
         if allow_large && use_large_os_page(size, try_alignment) {
             todo();
         }
@@ -308,13 +308,13 @@ fn unix_mmapx(
     size: usize,
     try_alignment: usize,
     prot_rw: bool,
-) -> (res: (usize, Tracked<MemChunk>))
+) -> (res: (*mut u8, Tracked<MemChunk>))
     requires
         hint as int % page_size() == 0,
         size as int % page_size() == 0,
         size <= SEGMENT_SIZE,
         try_alignment > 1 ==> try_alignment as int % page_size() == 0,
-    ensures ({ let (addr, mem) = res;
+    ensures ({ let (addr, mem) = res; let addr = addr.addr();
         addr != 0 ==> (
             mem@.wf()
             && mem@.os_exact_range(addr as int, size as int)
@@ -335,25 +335,25 @@ fn unix_mmapx(
         }
         if hint != 0 {
             let (p, Tracked(mem)) = if prot_rw {
-                mmap_prot_read_write(hint, size)
+                mmap_prot_read_write(hint as *mut u8, size)
             } else {
-                mmap_prot_none(hint, size)
+                mmap_prot_none(hint as *mut u8, size)
             };
-            if p != MAP_FAILED {
+            if p.addr() != MAP_FAILED {
                 return (p, Tracked(mem));
             }
         }
     }
     let (p, Tracked(mem)) = if prot_rw {
-        mmap_prot_read_write(hint, size)
+        mmap_prot_read_write(hint as *mut u8, size)
     } else {
-        mmap_prot_none(hint, size)
+        mmap_prot_none(hint as *mut u8, size)
     };
-    if p != MAP_FAILED {
+    if p.addr() != MAP_FAILED {
         return (p, Tracked(mem));
     }
 
-    return (0, Tracked(mem));
+    return (core::ptr::null_mut(), Tracked(mem));
 }
 
 }

@@ -2,7 +2,7 @@
 
 use state_machines_macros::*;
 use vstd::prelude::*;
-use vstd::ptr::*;
+use vstd::raw_ptr::*;
 use vstd::*;
 use vstd::set_lib::*;
 
@@ -24,7 +24,7 @@ pub fn arena_alloc_aligned(
     request_commit: bool,
     allow_large: bool,
     req_arena_id: ArenaId,
-) -> (res: (usize, Tracked<MemChunk>, bool, bool, bool, bool, usize))
+) -> (res: (*mut u8, Tracked<MemChunk>, bool, bool, bool, bool, usize))
     requires
         alignment as int % page_size() == 0,
         size as int % page_size() == 0,
@@ -32,6 +32,7 @@ pub fn arena_alloc_aligned(
         size == SEGMENT_SIZE,
     ensures ({
         let (addr, mem, commit, large, is_pinned, is_zero, mem_id) = res;
+        let addr = addr as int;
         addr != 0 ==> (
           mem@.wf()
             && mem@.os_exact_range(addr as int, size as int)
@@ -57,7 +58,7 @@ pub fn arena_alloc_aligned(
     let is_zero = true;
     let memid_os = 0;
     proof {
-        if p != 0 {
+        if p as int != 0 {
             mem.os_restrict(p as int, size as int);
         }
     }

@@ -3,7 +3,7 @@
 use core::intrinsics::{unlikely, likely};
 
 use vstd::prelude::*;
-use vstd::ptr::*;
+use vstd::raw_ptr::*;
 use vstd::*;
 use vstd::modes::*;
 use vstd::set_lib::*;
@@ -77,7 +77,7 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
     requires global.wf_right_to_use_thread(right, cur_thread@), // $line_count$Trusted$
         global.wf(), // $line_count$Trusted$
     ensures ({ let (heap, local_opt) = res; { // $line_count$Trusted$
-        heap.heap_ptr.id() != 0 ==> // $line_count$Trusted$
+        heap.heap_ptr.addr() != 0 ==> // $line_count$Trusted$
             local_opt@.is_some() // $line_count$Trusted$
             && local_opt@.unwrap().wf() // $line_count$Trusted$
             && local_opt@.unwrap().inst() == global.inst() // $line_count$Trusted$
@@ -89,8 +89,8 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
 
     // TODO use a cache for thread data
     let (addr, Tracked(mem)) = thread_data_alloc();
-    if addr == 0 {
-        return (HeapPtr { heap_ptr: PPtr::from_usize(0), heap_id: Ghost(arbitrary()) }, Tracked(None));
+    if addr.addr() == 0 {
+        return (HeapPtr { heap_ptr: core::ptr::null_mut(), heap_id: Ghost(arbitrary()) }, Tracked(None));
     }
 
     proof {
@@ -98,21 +98,21 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
         assert(SIZEOF_HEAP == vstd::layout::size_of::<Heap>());
         assert(SIZEOF_TLD == vstd::layout::size_of::<Tld>());
         assert(addr as int % vstd::layout::align_of::<Heap>() as int == 0);
-        assert((addr + SIZEOF_HEAP) as int % vstd::layout::align_of::<Tld>() as int == 0);
+        assert((addr as usize + SIZEOF_HEAP) as int % vstd::layout::align_of::<Tld>() as int == 0);
     }
     vstd::layout::layout_for_type_is_valid::<Heap>(); // $line_count$Proof$
     vstd::layout::layout_for_type_is_valid::<Tld>(); // $line_count$Proof$
 
     let tracked points_to_heap_raw = mem.take_points_to_range(addr as int, SIZEOF_HEAP as int);
-    let tracked points_to_tld_raw = mem.take_points_to_range(addr + SIZEOF_HEAP, SIZEOF_TLD as int);
-    let tracked mut points_to_heap = points_to_heap_raw.into_typed(addr as int);
-    let tracked mut points_to_tld = points_to_tld_raw.into_typed(addr + SIZEOF_HEAP);
-    let heap_ptr = PPtr::<Heap>::from_usize(addr);
-    let tld_ptr = PPtr::<Tld>::from_usize(addr + SIZEOF_HEAP);
+    let tracked points_to_tld_raw = mem.take_points_to_range(addr as usize + SIZEOF_HEAP, SIZEOF_TLD as int);
+    let tracked mut points_to_heap = points_to_heap_raw.into_typed(addr as usize);
+    let tracked mut points_to_tld = points_to_tld_raw.into_typed((addr as int + SIZEOF_HEAP) as usize);
+    let heap_ptr = addr as *mut Heap;
+    let tld_ptr = addr.with_addr(addr.addr() + SIZEOF_HEAP) as *mut Tld;
 
     let tracked (_, _, Tracked(uniq_reservation_tok)) = global.instance.reserve_uniq_identifier();
-    let heap = HeapPtr { heap_ptr, heap_id: Ghost(HeapId { id: heap_ptr.id() as nat, uniq: uniq_reservation_tok@.key.uniq }) };
-    let tld = TldPtr { tld_ptr, tld_id: Ghost(TldId { id: tld_ptr.id() as nat }) };
+    let heap = HeapPtr { heap_ptr, heap_id: Ghost(HeapId { id: heap_ptr.addr() as nat, uniq: uniq_reservation_tok@.key.uniq }) };
+    let tld = TldPtr { tld_ptr, tld_id: Ghost(TldId { id: tld_ptr.addr() as nat }) };
 
     let page_empty_stuff = init_empty_page_ptr();
     let EmptyPageStuff { ptr: page_empty_ptr, pfa: Tracked(page_empty_ptr_access) } = page_empty_stuff;
@@ -133,12 +133,12 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
     let mut i = 0;
     while i < SEGMENT_BIN_MAX + 1
         invariant 0 <= i <= SEGMENT_BIN_MAX + 1,
-          forall |j: int| 0 <= j < i ==> (#[trigger] span_queue_headers[j]).first.id() == 0
-              && span_queue_headers[j].last.id() == 0,
+          forall |j: int| 0 <= j < i ==> (#[trigger] span_queue_headers[j]).first.addr() == 0
+              && span_queue_headers[j].last.addr() == 0,
     {
         span_queue_headers.set(i, SpanQueueHeader {
-            first: PPtr::from_usize(0),
-            last: PPtr::from_usize(0),
+            first: core::ptr::null_mut(),
+            last: core::ptr::null_mut(),
         });
         i = i + 1;
     }
@@ -152,8 +152,8 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
           };
     {
         pages.push(PageQueue {
-            first: PPtr::from_usize(0),
-            last: PPtr::from_usize(0),
+            first: core::ptr::null_mut(),
+            last: core::ptr::null_mut(),
             block_size: 
         });
     }*/
@@ -169,7 +169,7 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
         is_thread.agrees(cur_thread);
     }
 
-    heap_ptr.put(Tracked(&mut points_to_heap), Heap {
+    ptr_mut_write(heap_ptr, Tracked(&mut points_to_heap), Heap {
         tld_ptr: tld,
         pages_free_direct: pages_free_direct_pcell,
         pages: pages_pcell,
@@ -183,7 +183,7 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
         page_empty_ptr,
     });
 
-    tld_ptr.put(Tracked(&mut points_to_tld), Tld {
+    ptr_mut_write(tld_ptr, Tracked(&mut points_to_tld), Tld {
         heap_backing: heap_ptr,
         segments: SegmentsTld {
             span_queue_headers,
@@ -241,15 +241,15 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
     };
 
     proof {
-        let emp = local.page_empty_global@.s.points_to@.pptr;
+        let emp = local.page_empty_global@.s.points_to.ptr();
         let pfd = local.heap.pages_free_direct@.value.unwrap()@;
         let pages = local.heap.pages@.value.unwrap()@;
         assert forall |wsize|
           0 <= wsize < pfd.len() implies
             pages_free_direct_match(
-                (#[trigger] pfd[wsize]).id(),
-                pages[smallest_bin_fitting_size(wsize * INTPTR_SIZE)].first.id(),
-                emp)
+                (#[trigger] pfd[wsize]) as int,
+                pages[smallest_bin_fitting_size(wsize * INTPTR_SIZE)].first as int,
+                emp as int)
         by {
             bounds_for_smallest_bin_fitting_size(wsize * INTPTR_SIZE);
             //assert(0 <= smallest_bin_fitting_size(wsize * INTPTR_SIZE));
@@ -259,9 +259,9 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
         assert(pages_free_direct_is_correct(
             local.heap.pages_free_direct@.value.unwrap()@,
             local.heap.pages@.value.unwrap()@,
-            emp));
+            emp as int));
         assert(local.heap.wf_basic(local.heap_id, local.thread_token@.value.heap, local.tld_id, local.instance));
-        assert(local.heap.wf(local.heap_id, local.thread_token@.value.heap, local.tld_id, local.instance, local.page_empty_global@.s.points_to@.pptr));
+        assert(local.heap.wf(local.heap_id, local.thread_token@.value.heap, local.tld_id, local.instance, local.page_empty_global@.s.points_to.ptr() as int));
         assert(local.wf_main());
         assert(local.wf());
     }
@@ -275,14 +275,14 @@ impl PageQueue {
     fn empty(wsize: usize) -> (pq: PageQueue)
         requires wsize < 0x1_0000_0000_0000,
         ensures
-          pq.first.id() == 0,
-          pq.last.id() == 0,
+          pq.first.addr() == 0,
+          pq.last.addr() == 0,
           pq.block_size == wsize * INTPTR_SIZE
     {
         assert(INTPTR_SIZE as usize == 8);
         PageQueue {
-            first: PPtr::from_usize(0),
-            last: PPtr::from_usize(0),
+            first: core::ptr::null_mut(),
+            last: core::ptr::null_mut(),
             block_size: wsize * INTPTR_SIZE as usize,
         }
     }
@@ -291,8 +291,8 @@ impl PageQueue {
 #[inline]
 fn pages_tmp() -> (pages: [PageQueue; 75])
     ensures pages@.len() == BIN_FULL + 1,
-      forall |p| 0 <= p < pages@.len() ==> (#[trigger] pages[p]).first.id() == 0
-          && pages[p].last.id() == 0
+      forall |p| 0 <= p < pages@.len() ==> (#[trigger] pages[p]).first.addr() == 0
+          && pages[p].last.addr() == 0
           && (valid_bin_idx(p) ==> pages[p].block_size == size_of_bin(p)),
       pages[0].block_size == 8,
       pages[BIN_FULL as int].block_size == 8 * (524288 + 2), //8 * (MEDIUM_OBJ_WSIZE_MAX + 2),
@@ -389,8 +389,8 @@ fn pages_tmp() -> (pages: [PageQueue; 75])
     ];
 
     proof {
-        assert forall |p| 0 <= p < pages@.len() ==> (#[trigger] pages[p]).first.id() == 0
-            && pages[p].last.id() == 0
+        assert forall |p| 0 <= p < pages@.len() ==> (#[trigger] pages[p]).first.addr() == 0
+            && pages[p].last.addr() == 0
             && (valid_bin_idx(p) ==> pages[p].block_size == size_of_bin(p))
         by {
             if valid_bin_idx(p) {
@@ -476,190 +476,190 @@ fn pages_tmp() -> (pages: [PageQueue; 75])
     pages
 }
 
-fn pages_free_direct_tmp() -> [PPtr<Page>; 129] {
+fn pages_free_direct_tmp() -> [*mut Page; 129] {
     [
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
-        PPtr::from_usize(0),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
     ]
 }
 
 fn span_queue_headers_tmp() -> [SpanQueueHeader; 32] {
     [
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
-        SpanQueueHeader { first: PPtr::from_usize(0), last: PPtr::from_usize(0) },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
+        SpanQueueHeader { first: core::ptr::null_mut(), last: core::ptr::null_mut() },
     ]
 }
 
 fn thread_data_alloc()
-    -> (res: (usize, Tracked<MemChunk>))
-    ensures ({ let (addr, mc) = res; {
+    -> (res: (*mut u8, Tracked<MemChunk>))
+    ensures ({ let (addr, mc) = res; let addr = addr.addr(); {
         addr != 0 ==> (
             mc@.pointsto_has_range(addr as int, SIZEOF_HEAP + SIZEOF_TLD)
-            && addr + page_size() <= usize::MAX
-            && addr % 4096 == 0
+            && addr as int + page_size() <= usize::MAX
+            && addr as int % 4096 == 0
         )
     }})
 {
-    let (addr, Tracked(mc)) = crate::os_mem::mmap_prot_read_write(0, 4096);
+    let (addr, Tracked(mc)) = crate::os_mem::mmap_prot_read_write(core::ptr::null_mut(), 4096);
 
-    if addr == MAP_FAILED {
+    if addr.addr() == MAP_FAILED {
         todo();
     }
 
@@ -689,15 +689,15 @@ pub fn get_page_empty()
 */
 
 struct EmptyPageStuff {
-    ptr: PPtr<Page>,
+    ptr: *mut Page,
     pfa: Tracked<Duplicable<PageFullAccess>>,
 }
 
 impl EmptyPageStuff {
     pub closed spec fn wf(&self) -> bool {
         self.pfa@@.wf_empty_page_global()
-        && self.pfa@@.s.points_to@.pptr == self.ptr.id()
-        && self.ptr.id() != 0
+        && self.pfa@@.s.points_to.ptr() == self.ptr
+        && self.ptr.addr() != 0
     }
 }
 
@@ -710,9 +710,9 @@ static EMPTY_PAGE_PTR: std::sync::LazyLock<EmptyPageStuff> =
 fn init_empty_page_ptr() -> (e: EmptyPageStuff)
     ensures e.wf(),
 {
-    let (pt, Tracked(mut mc)) = crate::os_mem::mmap_prot_read_write(0, 4096);
+    let (pt, Tracked(mut mc)) = crate::os_mem::mmap_prot_read_write(core::ptr::null_mut(), 4096);
 
-    if pt == MAP_FAILED {
+    if pt.addr() == MAP_FAILED {
         todo();
     }
 
@@ -730,7 +730,7 @@ fn init_empty_page_ptr() -> (e: EmptyPageStuff)
         assert(pt as int % vstd::layout::align_of::<Page>() as int == 0);
     }
     vstd::layout::layout_for_type_is_valid::<Page>(); // $line_count$Proof$
-    let tracked mut points_to = points_to_raw.into_typed::<Page>(pt as int);
+    let tracked mut points_to = points_to_raw.into_typed::<Page>(pt as usize);
     proof { points_to.is_nonnull(); }
 
     let (count_pcell, Tracked(count_perm)) = PCell::empty();
@@ -750,8 +750,8 @@ fn init_empty_page_ptr() -> (e: EmptyPageStuff)
 
     let tracked fake_inst = global_init().0.instance;
 
-    let page_ptr = PPtr::<Page>::from_usize(pt);
-    page_ptr.put(Tracked(&mut points_to), Page {
+    let page_ptr = pt as *mut Page;
+    ptr_mut_write(page_ptr, Tracked(&mut points_to), Page {
         count: count_pcell,
         offset: 0,
         inner: inner_pcell,

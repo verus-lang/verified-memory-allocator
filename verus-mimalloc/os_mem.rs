@@ -1,5 +1,5 @@
 use vstd::prelude::*;
-use vstd::ptr::*;
+use vstd::raw_ptr::*;
 use vstd::set_lib::*;
 use libc::{PROT_NONE, PROT_READ, PROT_WRITE, MAP_PRIVATE, MAP_ANONYMOUS, MAP_NORESERVE};
 
@@ -66,7 +66,7 @@ impl MemChunk {
 
     #[verifier::inline]
     pub open spec fn range_points_to(&self) -> Set<int> {
-        self.points_to@.dom()
+        self.points_to.dom()
     }
 
     pub open spec fn has_pointsto_for_all_read_write(&self) -> bool {
@@ -93,7 +93,7 @@ impl MemChunk {
         // Same domain for OS permissions knowledge
         self.os.dom() == the_old.os.dom()
         // points_to grew monotonically
-        && the_old.points_to@.dom().subset_of(self.points_to@.dom())
+        && the_old.points_to.dom().subset_of(self.points_to.dom())
         // stuff with rw permission grew monotonically
         && (forall |addr: int|
             #[trigger] the_old.os.dom().contains(addr)
@@ -105,7 +105,7 @@ impl MemChunk {
               self.os.dom().contains(addr)
               && self.os[addr]@.mem_protect == MemProtect { read: true, write: true }
               && the_old.os[addr]@.mem_protect != MemProtect { read: true, write: true }
-              ==> #[trigger] self.points_to@.dom().contains(addr)
+              ==> #[trigger] self.points_to.dom().contains(addr)
         )
     }
 }
@@ -124,76 +124,76 @@ pub const MAP_FAILED: usize = usize::MAX;
 
 #[verus::trusted]
 #[verifier::external_body]
-pub fn mmap_prot_none(hint: usize, len: usize) -> (pt: (usize, Tracked<MemChunk>))
+pub fn mmap_prot_none(hint: *mut u8, len: usize) -> (pt: (*mut u8, Tracked<MemChunk>))
     requires
         hint as int % page_size() == 0,
         len as int % page_size() == 0,
     ensures
-        pt.0 != MAP_FAILED ==> pt.1@.wf(),
-        pt.0 != MAP_FAILED ==> pt.1@.os_exact_range(pt.0 as int, len as int),
-        pt.0 != MAP_FAILED ==> pt.1@.os_has_range_no_read_write(pt.0 as int, len as int),
-        pt.0 != MAP_FAILED ==> pt.0 + len < usize::MAX,
+        pt.0.addr() != MAP_FAILED ==> pt.1@.wf(),
+        pt.0.addr() != MAP_FAILED ==> pt.1@.os_exact_range(pt.0 as int, len as int),
+        pt.0.addr() != MAP_FAILED ==> pt.1@.os_has_range_no_read_write(pt.0 as int, len as int),
+        pt.0.addr() != MAP_FAILED ==> pt.0.addr() + len < usize::MAX,
 {
     let p = _mmap_prot_none(hint as *mut libc::c_void, len);
-    let p = if p == libc::MAP_FAILED { MAP_FAILED } else { p as usize };
+    let p = if p == libc::MAP_FAILED { MAP_FAILED as *mut u8 } else { p as *mut u8 };
     (p, Tracked::assume_new())
 }
 
 #[verus::trusted]
 #[verifier::external_body]
-pub fn mmap_prot_read_write(hint: usize, len: usize) -> (pt: (usize, Tracked<MemChunk>))
+pub fn mmap_prot_read_write(hint: *mut u8, len: usize) -> (pt: (*mut u8, Tracked<MemChunk>))
     requires
         hint as int % page_size() == 0,
         len as int % page_size() == 0,
     ensures
-        pt.0 != MAP_FAILED ==> pt.1@.wf(),
-        pt.0 != MAP_FAILED ==> pt.1@.os_exact_range(pt.0 as int, len as int),
-        pt.0 != MAP_FAILED ==> pt.1@.os_has_range_read_write(pt.0 as int, len as int),
-        pt.0 != MAP_FAILED ==> pt.1@.has_pointsto_for_all_read_write(),
-        pt.0 != MAP_FAILED ==> pt.0 + len < usize::MAX,
-        pt.0 != MAP_FAILED ==> pt.0 as int % page_size() == 0,
+        pt.0.addr() != MAP_FAILED ==> pt.1@.wf(),
+        pt.0.addr() != MAP_FAILED ==> pt.1@.os_exact_range(pt.0 as int, len as int),
+        pt.0.addr() != MAP_FAILED ==> pt.1@.os_has_range_read_write(pt.0 as int, len as int),
+        pt.0.addr() != MAP_FAILED ==> pt.1@.has_pointsto_for_all_read_write(),
+        pt.0.addr() != MAP_FAILED ==> pt.0.addr() + len < usize::MAX,
+        pt.0.addr() != MAP_FAILED ==> pt.0 as int % page_size() == 0,
 {
     let p = _mmap_prot_read_write(hint as *mut libc::c_void, len);
-    let p = if p == libc::MAP_FAILED { MAP_FAILED } else { p as usize };
+    let p = if p == libc::MAP_FAILED { MAP_FAILED as *mut u8 } else { p as *mut u8 };
     (p, Tracked::assume_new())
 }
 
 #[verus::trusted]
 #[verifier::external_body]
-pub fn mprotect_prot_none(addr: PPtr<u8>, len: usize, Tracked(mem): Tracked<&mut MemChunk>) 
+pub fn mprotect_prot_none(addr: *mut u8, len: usize, Tracked(mem): Tracked<&mut MemChunk>) 
     requires
-        addr.id() as int % page_size() == 0,
+        addr as int % page_size() == 0,
         len as int % page_size() == 0,
 
         old(mem).wf(),
-        old(mem).os_exact_range(addr.id(), len as int),
+        old(mem).os_exact_range(addr as int, len as int),
         old(mem).has_pointsto_for_all_read_write(),
     ensures
         mem.wf(),
-        mem.os_exact_range(addr.id(), len as int),
-        mem.os_has_range_no_read_write(addr.id(), len as int),
-        mem.points_to@ === Map::empty(),
+        mem.os_exact_range(addr as int, len as int),
+        mem.os_has_range_no_read_write(addr as int, len as int),
+        mem.points_to.dom() === Set::empty(),
 {
-    _mprotect_prot_none(addr.uptr as *mut libc::c_void, len);
+    _mprotect_prot_none(addr as *mut libc::c_void, len);
 }
 
 #[verus::trusted]
 #[verifier::external_body]
-pub fn mprotect_prot_read_write(addr: PPtr<u8>, len: usize, Tracked(mem): Tracked<&mut MemChunk>)
+pub fn mprotect_prot_read_write(addr: *mut u8, len: usize, Tracked(mem): Tracked<&mut MemChunk>)
     requires
-        addr.id() as int % page_size() == 0,
+        addr as int % page_size() == 0,
         len as int % page_size() == 0,
         old(mem).wf(),
-        old(mem).os_exact_range(addr.id(), len as int),
+        old(mem).os_exact_range(addr as int, len as int),
     ensures
         mem.wf(),
-        mem.os_exact_range(addr.id(), len as int),
-        mem.os_has_range_read_write(addr.id(), len as int),
+        mem.os_exact_range(addr as int, len as int),
+        mem.os_has_range_read_write(addr as int, len as int),
         mem.has_new_pointsto(&*old(mem)),
         old(mem).has_pointsto_for_all_read_write() ==>
              mem.has_pointsto_for_all_read_write(),
 {
-    _mprotect_prot_read_write(addr.uptr as *mut libc::c_void, len);
+    _mprotect_prot_read_write(addr as *mut libc::c_void, len);
 }
 
 //// Tested for macOS / Linux

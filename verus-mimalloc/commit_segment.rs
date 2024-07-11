@@ -136,8 +136,8 @@ fn segment_commitx(
     requires old(local).wf_main(),
         segment.wf(),
         segment.is_in(*old(local)),
-        p >= segment.segment_ptr.id(),
-        p + size <= segment.segment_ptr.id() + SEGMENT_SIZE,
+        p >= segment.segment_ptr.addr(),
+        p + size <= segment.segment_ptr.addr() + SEGMENT_SIZE,
         // !commit ==> old(local).segments[segment.segment_id@]
         //    .mem.os_has_range_read_write(p as int, size as int),
         // !commit ==> old(local).segments[segment.segment_id@]
@@ -169,7 +169,7 @@ fn segment_commitx(
 
     let mut mask: CommitMask = CommitMask::empty();
     let (start, full_size) = segment_commit_mask(
-        segment.segment_ptr.to_usize(), !commit, p, size, &mut mask);
+        segment.segment_ptr.addr(), !commit, p, size, &mut mask);
 
     if mask.is_empty() || full_size == 0 {
         return true;
@@ -254,7 +254,7 @@ fn segment_commitx(
             assert forall |j: int| set_int_range(p as int, p + size).contains(j)
                 implies local.commit_mask(sid).bytes(sid).contains(j)
             by {
-                assert(segment_start(sid) == segment.segment_ptr.id());
+                assert(segment_start(sid) == segment.segment_ptr.addr());
                 let k = (j - segment_start(sid)) / COMMIT_SIZE as int;
                 assert(mask@.contains(k));
             }
@@ -302,8 +302,8 @@ pub fn segment_ensure_committed(
     requires old(local).wf_main(),
         segment.wf(),
         segment.is_in(*old(local)),
-        p >= segment.segment_ptr.id(),
-        p + size <= segment.segment_ptr.id() + SEGMENT_SIZE,
+        p >= segment.segment_ptr.addr(),
+        p + size <= segment.segment_ptr.addr() + SEGMENT_SIZE,
     ensures
         local.wf_main(),
         common_preserves(*old(local), *local),
@@ -340,8 +340,8 @@ pub fn segment_perhaps_decommit(
     requires old(local).wf_main(),
         segment.wf(),
         segment.is_in(*old(local)),
-        p >= segment.segment_ptr.id(),
-        p + size <= segment.segment_ptr.id() + SEGMENT_SIZE,
+        p >= segment.segment_ptr.addr(),
+        p + size <= segment.segment_ptr.addr() + SEGMENT_SIZE,
         set_int_range(p as int, p + size).disjoint(
             segment_info_range(segment.segment_id@)
                 + old(local).segment_pages_used_total(segment.segment_id@)
@@ -366,7 +366,7 @@ pub fn segment_perhaps_decommit(
 
         let mut mask: CommitMask = CommitMask::empty();
         let (start, full_size) =
-            segment_commit_mask(segment.segment_ptr.to_usize(), true, p, size, &mut mask);
+            segment_commit_mask(segment.segment_ptr.addr(), true, p, size, &mut mask);
 
         if mask.is_empty() || full_size == 0 {
             return;
@@ -383,13 +383,13 @@ pub fn segment_perhaps_decommit(
             reveal(CommitMask::bytes);
             let segment_id = segment.segment_id@;
             segment_start_mult_commit_size(segment_id);
-            assert(segment.segment_ptr.id() % COMMIT_SIZE as int == 0);
+            assert(segment.segment_ptr as int % COMMIT_SIZE as int == 0);
             /*assert forall |addr| mask.bytes(segment_id).contains(addr)
                 implies set_int_range(p as int, p + size).contains(addr)
             by {
-                assert(mask@.contains((addr - segment.segment_ptr.id()) / COMMIT_SIZE as int));
-                assert((addr - segment.segment_ptr.id()) / COMMIT_SIZE as int
-                    >= (start - segment.segment_ptr.id()) / COMMIT_SIZE as int);
+                assert(mask@.contains((addr - segment.segment_ptr.addr()) / COMMIT_SIZE as int));
+                assert((addr - segment.segment_ptr.addr()) / COMMIT_SIZE as int
+                    >= (start - segment.segment_ptr.addr()) / COMMIT_SIZE as int);
                 assert(addr >= start);
                 assert(addr >= p);
                 assert(addr < p + size);
@@ -500,7 +500,7 @@ pub fn segment_delayed_decommit(
         }
         idx = next_idx;
 
-        let p = segment.segment_ptr.to_usize() + idx * COMMIT_SIZE as usize;
+        let p = segment.segment_ptr.addr() + idx * COMMIT_SIZE as usize;
         let size = count * COMMIT_SIZE as usize;
         segment_commitx(segment, false, p, size, Tracked(&mut *local));
     }

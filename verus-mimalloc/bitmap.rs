@@ -2,7 +2,7 @@
 
 use state_machines_macros::*;
 use vstd::prelude::*;
-use vstd::ptr::*;
+use vstd::raw_ptr::*;
 use vstd::*;
 use vstd::set_lib::*;
 

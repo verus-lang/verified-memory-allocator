@@ -3,7 +3,7 @@
 use core::intrinsics::{unlikely, likely};
 
 use vstd::prelude::*;
-use vstd::ptr::*;
+use vstd::raw_ptr::*;
 use vstd::*;
 use vstd::modes::*;
 use vstd::set_lib::*;
@@ -32,9 +32,9 @@ pub fn find_page(heap_ptr: HeapPtr, size: usize, huge_alignment: usize, Tracked(
     ensures
         local.wf(),
         common_preserves(*old(local), *local),
-        page.page_ptr.id() != 0 ==> page.wf() && page.is_in(*local)
+        page.page_ptr.addr() != 0 ==> page.wf() && page.is_in(*local)
             && page.is_used_and_primary(*local),
-        page.page_ptr.id() != 0 ==> 
+        page.page_ptr.addr() != 0 ==> 
             local.pages.index(page.page_id@).inner@.value.unwrap().xblock_size >= size,
 {
     proof { const_facts(); }
@@ -60,9 +60,9 @@ fn find_free_page(heap_ptr: HeapPtr, size: usize, Tracked(local): Tracked<&mut L
     ensures
         local.wf(),
         common_preserves(*old(local), *local),
-        page.page_ptr.id() != 0 ==> page.wf() && page.is_in(*local)
+        page.page_ptr.addr() != 0 ==> page.wf() && page.is_in(*local)
             && page.is_used_and_primary(*local),
-        page.page_ptr.id() != 0 ==> 
+        page.page_ptr.addr() != 0 ==> 
             local.pages.index(page.page_id@).inner@.value.unwrap().xblock_size >= size,
 {
     proof { const_facts(); }
@@ -75,7 +75,7 @@ fn find_free_page(heap_ptr: HeapPtr, size: usize, Tracked(local): Tracked<&mut L
 
     let mut page = PagePtr { page_ptr: heap_ptr.get_pages(Tracked(&*local))[pq].first, page_id: Ghost(local.page_organization.used_dlist_headers[pq as int].first.get_Some_0()) };
 
-    if page.page_ptr.to_usize() != 0 {
+    if page.page_ptr.addr() != 0 {
         crate::alloc_generic::page_free_collect(page, false, Tracked(&mut *local));
 
         if !page.get_inner_ref(Tracked(&*local)).free.is_empty() {
@@ -96,9 +96,9 @@ fn page_queue_find_free_ex(heap_ptr: HeapPtr, pq: usize, first_try: bool, Tracke
     ensures
         local.wf(),
         common_preserves(*old(local), *local),
-        page.page_ptr.id() != 0 ==> page.wf() && page.is_in(*local)
+        page.page_ptr.addr() != 0 ==> page.wf() && page.is_in(*local)
             && page.is_used_and_primary(*local),
-        page.page_ptr.id() != 0 ==> 
+        page.page_ptr.addr() != 0 ==> 
             local.pages.index(page.page_id@).inner@.value.unwrap().xblock_size == size_of_bin(pq as int)
 {
     let mut page = PagePtr { page_ptr: heap_ptr.get_pages(Tracked(&*local))[pq].first, page_id: Ghost(local.page_organization.used_dlist_headers[pq as int].first.get_Some_0()) };
@@ -115,11 +115,11 @@ fn page_queue_find_free_ex(heap_ptr: HeapPtr, pq: usize, first_try: bool, Tracke
             common_preserves(*old(local), *local),
             0 <= pq <= BIN_HUGE,
             size_of_bin(pq as int) <= MEDIUM_OBJ_SIZE_MAX,
-            page.page_ptr.id() != 0 ==>
+            page.page_ptr.addr() != 0 ==>
                 page.wf()
                 && local.page_organization.valid_used_page(page.page_id@, pq as int, list_idx),
     {
-        if page.page_ptr.to_usize() == 0 {
+        if page.page_ptr.addr() == 0 {
             break;
         }
 
@@ -164,9 +164,9 @@ fn page_queue_find_free_ex(heap_ptr: HeapPtr, pq: usize, first_try: bool, Tracke
         }
     }
 
-    if page.page_ptr.to_usize() == 0 {
+    if page.page_ptr.addr() == 0 {
         let page = page_fresh(heap_ptr, pq, Tracked(&mut *local));
-        if page.page_ptr.to_usize() == 0 && first_try {
+        if page.page_ptr.addr() == 0 && first_try {
             return page_queue_find_free_ex(heap_ptr, pq, false, Tracked(&mut *local))
         } else {
             return page;
@@ -191,9 +191,9 @@ fn page_fresh(heap_ptr: HeapPtr, pq: usize, Tracked(local): Tracked<&mut Local>)
     ensures
         local.wf(),
         common_preserves(*old(local), *local),
-        page.page_ptr.id() != 0 ==> page.wf() && page.is_in(*local)
+        page.page_ptr.addr() != 0 ==> page.wf() && page.is_in(*local)
             && page.is_used_and_primary(*local),
-        page.page_ptr.id() != 0 ==> 
+        page.page_ptr.addr() != 0 ==> 
             local.pages.index(page.page_id@).inner@.value.unwrap().xblock_size == size_of_bin(pq as int)
 
 {
@@ -214,14 +214,14 @@ fn page_fresh_alloc(heap_ptr: HeapPtr, pq: usize, block_size: usize, page_alignm
     ensures
         local.wf(),
         common_preserves(*old(local), *local),
-        page.page_ptr.id() != 0 ==> page.wf() && page.is_in(*local)
+        page.page_ptr.addr() != 0 ==> page.wf() && page.is_in(*local)
             && page.is_used_and_primary(*local),
-        page.page_ptr.id() != 0 ==> 
+        page.page_ptr.addr() != 0 ==> 
             local.pages.index(page.page_id@).inner@.value.unwrap().xblock_size == block_size,
 {
     let tld_ptr = heap_ptr.get_ref(Tracked(&*local)).tld_ptr;
     let page_ptr = crate::segment::segment_page_alloc(heap_ptr, block_size, page_alignment, tld_ptr, Tracked(&mut *local));
-    if page_ptr.page_ptr.to_usize() == 0 {
+    if page_ptr.page_ptr.addr() == 0 {
         return page_ptr;
     }
 
@@ -320,7 +320,7 @@ fn page_init(heap_ptr: HeapPtr, page_ptr: PagePtr, block_size: usize, tld_ptr: T
         let tracked (Tracked(emp_inst), Tracked(emp_x), Tracked(emp_y)) = BoolAgree::Instance::initialize(false);
         let ghost g = (Ghost(local.instance), Ghost(page_ptr.page_id@), Tracked(emp_x), Tracked(emp_inst));
         page.xheap = AtomicHeapPtr {
-            atomic: AtomicUsize::new(Ghost(g), heap_ptr.heap_ptr.to_usize(), Tracked((emp_y, Some(heap_of_page_token)))),
+            atomic: AtomicPtr::new(Ghost(g), heap_ptr.heap_ptr, Tracked((emp_y, Some(heap_of_page_token)))),
             instance: Ghost(local.instance), page_id: Ghost(page_ptr.page_id@), emp: Tracked(emp_x), emp_inst: Tracked(emp_inst), };
         page.xthread_free.enable(Ghost(block_size as nat), Ghost(page_ptr.page_id@),
             Tracked(local.instance.clone()), Tracked(delay_token));
@@ -570,8 +570,8 @@ pub fn page_retire(page: PagePtr, Tracked(local): Tracked<&mut Local>)
           && !(heap.get_pages(Tracked(&*local))[pq].block_size > MEDIUM_OBJ_SIZE_MAX as usize)
     )
     {
-        if heap.get_pages(Tracked(&*local))[pq].last.to_usize() == page.page_ptr.to_usize() &&
-            heap.get_pages(Tracked(&*local))[pq].first.to_usize() == page.page_ptr.to_usize()
+        if heap.get_pages(Tracked(&*local))[pq].last.addr() == page.page_ptr.addr() &&
+            heap.get_pages(Tracked(&*local))[pq].first.addr() == page.page_ptr.addr()
         {
             let RETIRE_CYCLES = 8;
             page_get_mut_inner!(page, local, inner => {

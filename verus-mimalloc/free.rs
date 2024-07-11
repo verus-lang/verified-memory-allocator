@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 
 use vstd::prelude::*;
-use vstd::ptr::*;
+use vstd::raw_ptr::*;
 use vstd::*;
 use vstd::modes::*;
 
@@ -50,22 +50,22 @@ verus!{
 //     (Also note that setting the 'Freeing' state does not prevent the next thread that
 //     comes along from adding to the thread_free list.)
 
-pub fn free(ptr: PPtr<u8>, Tracked(user_perm): Tracked<ptr::PointsToRaw>, Tracked(user_dealloc): Tracked<Option<MimDealloc>>, Tracked(local): Tracked<&mut Local>)
+pub fn free(ptr: *mut u8, Tracked(user_perm): Tracked<PointsToRaw>, Tracked(user_dealloc): Tracked<Option<MimDealloc>>, Tracked(local): Tracked<&mut Local>)
     // According to the Linux man pages, `ptr` is allowed to be NULL,
     // in which case no operation is performed.
     requires
         old(local).wf(),
-        ptr.id() != 0 ==> user_dealloc.is_some(),
-        ptr.id() != 0 ==> user_dealloc.unwrap().wf(),
-        ptr.id() != 0 ==> user_perm.is_range(ptr.id(), user_dealloc.unwrap().size()),
-        ptr.id() != 0 ==> ptr.id() == user_dealloc.unwrap().ptr(),
-        ptr.id() != 0 ==> old(local).inst() == user_dealloc.unwrap().inst()
+        ptr.addr() != 0 ==> user_dealloc.is_some(),
+        ptr.addr() != 0 ==> user_dealloc.unwrap().wf(),
+        ptr.addr() != 0 ==> user_perm.is_range(ptr as int, user_dealloc.unwrap().size()),
+        ptr.addr() != 0 ==> ptr == user_dealloc.unwrap().ptr(),
+        ptr.addr() != 0 ==> old(local).inst() == user_dealloc.unwrap().inst()
     ensures
         local.wf(),
         local.inst() == old(local).inst(),
         forall |heap: HeapPtr| heap.is_in(*old(local)) ==> heap.is_in(*local),
 {
-    if ptr.to_usize() == 0 {
+    if ptr.addr() == 0 {
         return;
     }
 
@@ -89,7 +89,7 @@ pub fn free(ptr: PPtr<u8>, Tracked(user_perm): Tracked<ptr::PointsToRaw>, Tracke
             &dealloc.mim_block,
         );
 
-    let segment: &SegmentHeader = segment_ptr.borrow(
+    let segment: &SegmentHeader = ptr_ref(segment_ptr,
         Tracked(&segment_shared_access.points_to));
 
     // Determine if this operation is thread local or not
@@ -125,7 +125,7 @@ pub fn free(ptr: PPtr<u8>, Tracked(user_perm): Tracked<ptr::PointsToRaw>, Tracke
             &dealloc.mim_block,
         );
 
-    let slice_page: &Page = slice_page_ptr.borrow(
+    let slice_page: &Page = ptr_ref(slice_page_ptr,
         Tracked(&page_slice_shared_access.points_to));
 
     // Use the 'offset' to calculate a pointer to the main PageHeader for this page.
@@ -139,7 +139,7 @@ pub fn free(ptr: PPtr<u8>, Tracked(user_perm): Tracked<ptr::PointsToRaw>, Tracke
         Ghost(dealloc.block_id().page_id),
     );
 
-    assert(is_page_ptr(page_ptr.id(), dealloc.block_id().page_id));
+    assert(is_page_ptr(page_ptr as int, dealloc.block_id().page_id));
 
     /*
     let tracked page_shared_access: &PageSharedAccess;
@@ -155,7 +155,7 @@ pub fn free(ptr: PPtr<u8>, Tracked(user_perm): Tracked<ptr::PointsToRaw>, Tracke
         page_ptr,
         page_id: Ghost(page_id),
     };
-    assert(page_ptr.id() != 0) by { is_page_ptr_nonzero(page_ptr.id(), page_id); }
+    assert(page_ptr.addr() != 0) by { is_page_ptr_nonzero(page_ptr as int, page_id); }
 
     // Case based on whether this is thread local or not
 
@@ -202,12 +202,12 @@ pub fn free(ptr: PPtr<u8>, Tracked(user_perm): Tracked<ptr::PointsToRaw>, Tracke
     }
 }
 
-fn free_generic(segment: PPtr<SegmentHeader>, page: PagePtr, is_local: bool, p: PPtr<u8>, Tracked(perm): Tracked<ptr::PointsToRaw>, Tracked(dealloc): Tracked<MimDeallocInner>, Tracked(local): Tracked<&mut Local>)
+fn free_generic(segment: *mut SegmentHeader, page: PagePtr, is_local: bool, p: *mut u8, Tracked(perm): Tracked<PointsToRaw>, Tracked(dealloc): Tracked<MimDeallocInner>, Tracked(local): Tracked<&mut Local>)
     requires
         old(local).wf(),
         dealloc.wf(),
-        perm.is_range(p.id(), dealloc.block_id().block_size as int),
-        p.id() == dealloc.ptr,
+        perm.is_range(p as int, dealloc.block_id().block_size as int),
+        p == dealloc.ptr,
         old(local).instance == dealloc.mim_instance,
         page.wf(),
         is_local ==> page.is_in(*old(local)),
@@ -226,12 +226,12 @@ fn free_generic(segment: PPtr<SegmentHeader>, page: PagePtr, is_local: bool, p: 
     free_block(page, is_local, p, Tracked(perm), Tracked(dealloc), Tracked(&mut *local));
 }
 
-fn free_block(page: PagePtr, is_local: bool, ptr: PPtr<u8>, Tracked(perm): Tracked<ptr::PointsToRaw>, Tracked(dealloc): Tracked<MimDeallocInner>, Tracked(local): Tracked<&mut Local>)
+fn free_block(page: PagePtr, is_local: bool, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw>, Tracked(dealloc): Tracked<MimDeallocInner>, Tracked(local): Tracked<&mut Local>)
     requires
         old(local).wf(),
         dealloc.wf(),
-        perm.is_range(ptr.id(), dealloc.block_id().block_size as int),
-        ptr.id() == dealloc.ptr,
+        perm.is_range(ptr as int, dealloc.block_id().block_size as int),
+        ptr == dealloc.ptr,
         old(local).instance == dealloc.mim_instance,
         page.wf(),
         is_local ==> page.is_in(*old(local)),
@@ -276,12 +276,12 @@ fn free_block(page: PagePtr, is_local: bool, ptr: PPtr<u8>, Tracked(perm): Track
     }
 }
 
-fn free_block_mt(page: PagePtr, ptr: PPtr<u8>, Tracked(perm): Tracked<ptr::PointsToRaw>, Tracked(dealloc): Tracked<MimDeallocInner>, Tracked(local): Tracked<&mut Local>)
+fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw>, Tracked(dealloc): Tracked<MimDeallocInner>, Tracked(local): Tracked<&mut Local>)
     requires
         old(local).wf(),
         dealloc.wf(),
-        perm.is_range(ptr.id(), dealloc.block_id().block_size as int),
-        ptr.id() == dealloc.ptr,
+        perm.is_range(ptr as int, dealloc.block_id().block_size as int),
+        ptr == dealloc.ptr,
         old(local).instance == dealloc.mim_instance,
         page.page_id@ == dealloc.block_id().page_id,
         page.wf(),
@@ -297,7 +297,7 @@ fn free_block_mt(page: PagePtr, ptr: PPtr<u8>, Tracked(perm): Tracked<ptr::Point
     let tracked mut delay_actor_token_opt: Option<Mim::delay_actor> = None;
     let tracked MimDeallocInner { mim_block, mim_instance, .. } = dealloc;
     let tracked mut mim_block_opt = Some(mim_block);
-    let ptr = PPtr::<Node>::from_usize(ptr.to_usize());
+    let ptr = ptr as *mut Node;
     let mut use_delayed;
 
     loop
@@ -306,9 +306,9 @@ fn free_block_mt(page: PagePtr, ptr: PPtr<u8>, Tracked(perm): Tracked<ptr::Point
             mim_block_opt == Some(dealloc.mim_block),
             mim_instance == dealloc.mim_instance,
             mim_instance == local.instance,
-            perm.is_range(ptr.id(), dealloc.block_id().block_size as int),
-            ptr.id() == dealloc.ptr,
-            is_page_ptr(page.page_ptr.id(), dealloc.block_id().page_id),
+            perm.is_range(ptr as int, dealloc.block_id().block_size as int),
+            ptr as *mut u8 == dealloc.ptr,
+            is_page_ptr(page.page_ptr as int, dealloc.block_id().page_id),
             local.wf(),
             common_preserves(*old(local), *local),
 
@@ -324,7 +324,7 @@ fn free_block_mt(page: PagePtr, ptr: PPtr<u8>, Tracked(perm): Tracked<ptr::Point
         let tracked page_shared_access: &PageSharedAccess =
             mim_instance.alloc_guards_page_shared_access(
                 dealloc.block_id(), mim_block_opt.tracked_borrow());
-        let pag: &Page = page.page_ptr.borrow(Tracked(&page_shared_access.points_to));
+        let pag: &Page = ptr_ref(page.page_ptr, Tracked(&page_shared_access.points_to));
 
 
         let ghost mut next_ptr;
@@ -347,7 +347,7 @@ fn free_block_mt(page: PagePtr, ptr: PPtr<u8>, Tracked(perm): Tracked<ptr::Point
             proof {
                 block_size_ge_word();
                 block_ptr_aligned_to_word();
-                is_block_ptr_mult4(ptr.id(), dealloc.block_id());
+                is_block_ptr_mult4(ptr as int, dealloc.block_id());
             }
 
             // *ptr = mask.next_ptr
@@ -357,7 +357,7 @@ fn free_block_mt(page: PagePtr, ptr: PPtr<u8>, Tracked(perm): Tracked<ptr::Point
                 masked_ptr_delay_get_ptr(mask, Ghost(delay), Ghost(next_ptr)));
 
             proof {
-                perm = PointsToRaw::empty();
+                perm = PointsToRaw::empty(ptr@.provenance);
                 ptr_mem = Some(ptr_mem0.get());
                 raw_mem = Some(raw_mem0.get());
             }
@@ -401,7 +401,7 @@ fn free_block_mt(page: PagePtr, ptr: PPtr<u8>, Tracked(perm): Tracked<ptr::Point
 
                     mim_block_opt = None;
 
-                    is_block_ptr_mult4(ptr.id(), dealloc.block_id());
+                    is_block_ptr_mult4(ptr as int, dealloc.block_id());
                 } else {
                     // do nothing
 
@@ -423,8 +423,8 @@ fn free_block_mt(page: PagePtr, ptr: PPtr<u8>, Tracked(perm): Tracked<ptr::Point
             assert(ghost_ll.fixed_page());
             assert(delay_token@.instance == pag.xthread_free.instance@);
             assert(delay_token@.key == pag.xthread_free.page_id());
-            assert(v_new as int == ghost_ll.ptr().id() + delay_token@.value.to_int());
-            assert(ghost_ll.ptr().id() % 4 == 0);
+            assert(v_new as int == ghost_ll.ptr() as int + delay_token@.value.to_int());
+            assert(ghost_ll.ptr() as int % 4 == 0);
         });
 
         match cas_result {
@@ -439,9 +439,9 @@ fn free_block_mt(page: PagePtr, ptr: PPtr<u8>, Tracked(perm): Tracked<ptr::Point
                     let tracked page_shared_access: &PageSharedAccess =
                         mim_instance.alloc_guards_page_shared_access(
                             dealloc.block_id(), mim_block_opt.tracked_borrow());
-                    let pag: &Page = page.page_ptr.borrow(Tracked(&page_shared_access.points_to));
+                    let pag: &Page = ptr_ref(page.page_ptr, Tracked(&page_shared_access.points_to));
 
-                    let heap_ptr_int = atomic_with_ghost!(
+                    let heap_ptr = atomic_with_ghost!(
                         &pag.xheap.atomic => load();
                         ghost g =>
                     {
@@ -459,7 +459,6 @@ fn free_block_mt(page: PagePtr, ptr: PPtr<u8>, Tracked(perm): Tracked<ptr::Point
                         delay_actor_token = tok;
                         heap_id = g.1.unwrap().view().value;
                     });
-                    let heap_ptr = PPtr::<Heap>::from_usize(heap_ptr_int);
 
                     let tracked heap_shared_access: &HeapSharedAccess;
                     proof {
@@ -469,7 +468,7 @@ fn free_block_mt(page: PagePtr, ptr: PPtr<u8>, Tracked(perm): Tracked<ptr::Point
                         );
                         assert(heap_shared_access.wf2(heap_id, mim_instance));
                     }
-                    let heap: &Heap = heap_ptr.borrow(
+                    let heap: &Heap = ptr_ref(heap_ptr,
                         Tracked(&heap_shared_access.points_to));
 
                     let tracked mim_block = mim_block_opt.tracked_unwrap();
@@ -480,7 +479,7 @@ fn free_block_mt(page: PagePtr, ptr: PPtr<u8>, Tracked(perm): Tracked<ptr::Point
                     let tracked page_shared_access: &PageSharedAccess =
                         mim_instance.delay_guards_page_shared_access(
                             dealloc.block_id().page_id, &delay_actor_token);
-                    let pag: &Page = page.page_ptr.borrow(Tracked(&page_shared_access.points_to));
+                    let pag: &Page = ptr_ref(page.page_ptr, Tracked(&page_shared_access.points_to));
 
                     //pag.xthread_free.exit_delaying_state(Tracked(delay_actor_token));
 
@@ -504,6 +503,8 @@ fn free_block_mt(page: PagePtr, ptr: PPtr<u8>, Tracked(perm): Tracked<ptr::Point
 
                             g = (emp_token, Some((delay_token, ll)));
 
+                            let v_old = v_old as usize;
+
                             assert(v_old % 4 == 1usize ==> (v_old ^ 3) == add(v_old, 1))
                               by (bit_vector);
                         }
@@ -515,15 +516,15 @@ fn free_block_mt(page: PagePtr, ptr: PPtr<u8>, Tracked(perm): Tracked<ptr::Point
     }
 }
 
-pub fn free_delayed_block(ptr: PPtr<u8>,
-    Tracked(perm): Tracked<ptr::PointsToRaw>,
+pub fn free_delayed_block(ptr: *mut u8,
+    Tracked(perm): Tracked<PointsToRaw>,
     Tracked(dealloc): Tracked<MimDeallocInner>,
     Tracked(local): Tracked<&mut Local>,
-) -> (res: (bool, Tracked<Option<ptr::PointsToRaw>>, Tracked<Option<MimDeallocInner>>))
+) -> (res: (bool, Tracked<Option<PointsToRaw>>, Tracked<Option<MimDeallocInner>>))
     requires old(local).wf(),
         dealloc.wf(),
-        perm.is_range(ptr.id(), dealloc.block_id().block_size as int),
-        ptr.id() == dealloc.ptr,
+        perm.is_range(ptr as int, dealloc.block_id().block_size as int),
+        ptr == dealloc.ptr,
         old(local).instance == dealloc.mim_instance,
         dealloc.mim_block@.value.heap_id == Some(old(local).thread_token@.value.heap_id),
     ensures
@@ -541,7 +542,7 @@ pub fn free_delayed_block(ptr: PPtr<u8>,
             block_id,
             &dealloc.mim_block,
         );
-    let slice_page: &Page = slice_page_ptr.borrow(
+    let slice_page: &Page = ptr_ref(slice_page_ptr,
         Tracked(&page_slice_shared_access.points_to));
     let offset = slice_page.offset;
     let page_ptr = crate::layout::calculate_page_ptr_subtract_offset(
@@ -550,9 +551,9 @@ pub fn free_delayed_block(ptr: PPtr<u8>,
         Ghost(block_id.page_id_for_slice()),
         Ghost(block_id.page_id),
     );
-    assert(crate::layout::is_page_ptr(page_ptr.id(), block_id.page_id));
+    assert(crate::layout::is_page_ptr(page_ptr as int, block_id.page_id));
     let ghost page_id = dealloc.block_id().page_id;
-    assert(page_ptr.id() != 0) by { is_page_ptr_nonzero(page_ptr.id(), page_id); }
+    assert(page_ptr as int != 0) by { is_page_ptr_nonzero(page_ptr as int, page_id); }
 
     let page = PagePtr { page_ptr: page_ptr, page_id: Ghost(block_id.page_id) };
     proof {

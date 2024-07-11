@@ -3,7 +3,7 @@
 use core::intrinsics::{unlikely, likely};
 
 use vstd::prelude::*;
-use vstd::ptr::*;
+use vstd::raw_ptr::*;
 use vstd::*;
 use vstd::modes::*;
 use vstd::set_lib::*;
@@ -50,7 +50,7 @@ pub fn segment_page_alloc(
     ensures
         local.wf_main(),
         common_preserves(*old(local), *local),
-        (page_ptr.page_ptr.id() != 0 ==>
+        (page_ptr.page_ptr.addr() != 0 ==>
             page_ptr.wf()
             && page_ptr.is_in(*local)
             && local.page_organization.popped == Popped::Ready(page_ptr.page_id@, true)
@@ -58,7 +58,7 @@ pub fn segment_page_alloc(
             && good_count_for_block_size(block_size as int,
                     local.page_organization.pages[page_ptr.page_id@].count.unwrap() as int)
         ),
-        page_ptr.page_ptr.id() == 0 ==> local.wf(),
+        page_ptr.page_ptr.addr() == 0 ==> local.wf(),
 {
     proof { const_facts(); }
 
@@ -102,7 +102,7 @@ fn segments_page_alloc(
     ensures
         local.wf_main(),
         common_preserves(*old(local), *local),
-        (page_ptr.page_ptr.id() != 0 ==>
+        (page_ptr.page_ptr.addr() != 0 ==>
             page_ptr.wf()
             && page_ptr.is_in(*local)
             && local.page_organization.popped == Popped::Ready(page_ptr.page_id@, true)
@@ -110,7 +110,7 @@ fn segments_page_alloc(
             && good_count_for_block_size(block_size as int,
                     local.page_organization.pages[page_ptr.page_id@].count.unwrap() as int)
         ),
-        page_ptr.page_ptr.id() == 0 ==>
+        page_ptr.page_ptr.addr() == 0 ==>
             local.wf(),
 
 {
@@ -149,10 +149,10 @@ fn segments_page_alloc(
 
     let page_ptr = segments_page_find_and_allocate(slices_needed, tld,
           Tracked(&mut *local), Ghost(block_size as nat));
-    if page_ptr.page_ptr.to_usize() == 0 {
+    if page_ptr.page_ptr.addr() == 0 {
         let roa = segment_reclaim_or_alloc(heap, slices_needed, block_size, tld,
             Tracked(&mut *local));
-        if roa.segment_ptr.to_usize() == 0 {
+        if roa.segment_ptr.addr() == 0 {
             return PagePtr::null();
         } else {
             return segments_page_alloc(heap, required, block_size, tld, Tracked(&mut *local));
@@ -201,7 +201,7 @@ fn segments_page_find_and_allocate(
     ensures
         local.wf_main(),
         common_preserves(*old(local), *local),
-        (page_ptr.page_ptr.id() != 0 ==>
+        (page_ptr.page_ptr.addr() != 0 ==>
             page_ptr.wf()
             && page_ptr.is_in(*local)
             //&& allocated_block_tokens(blocks@, page_ptr.page_id@, block_size, n_blocks, local.instance)
@@ -209,7 +209,7 @@ fn segments_page_find_and_allocate(
             && page_init_is_committed(page_ptr.page_id@, *local)
             && (slice_count0 > 0 ==> local.page_organization.pages[page_ptr.page_id@].count == Some(slice_count0 as nat))
         ),
-        (page_ptr.page_ptr.id() == 0 ==> local.wf()),
+        (page_ptr.page_ptr.addr() == 0 ==> local.wf()),
 {
     let mut sbin_idx = slice_bin(slice_count0);
     let slice_count = if slice_count0 == 0 { 1 } else { slice_count0 };
@@ -224,7 +224,7 @@ fn segments_page_find_and_allocate(
             slice_count == (if slice_count0 == 0 { 1 } else { slice_count0 }),
             common_preserves(*old(local), *local),
     {
-        let mut slice_ptr = tld_ptr.tld_ptr.borrow(Tracked(&local.tld))
+        let mut slice_ptr = ptr_ref(tld_ptr.tld_ptr, Tracked(&local.tld))
               .segments.span_queue_headers[sbin_idx].first;
         let ghost mut list_idx = 0int;
         let ghost mut slice_page_id: Option<PageId> =
@@ -233,7 +233,7 @@ fn segments_page_find_and_allocate(
             local.page_organization.first_is_in(sbin_idx as int);
         }
 
-        while slice_ptr.to_usize() != 0
+        while slice_ptr.addr() != 0
             invariant
                 local.wf(),
                 tld_ptr.wf(),
@@ -381,7 +381,7 @@ fn span_queue_delete(
             list_idx);
     }
 
-    if prev.to_usize() == 0 {
+    if prev.addr() == 0 {
         tld_get_mut!(tld_ptr, local, tld => {
             let cq = tld.segments.span_queue_headers[sbin_idx];
             tld.segments.span_queue_headers.set(
@@ -415,7 +415,7 @@ fn span_queue_delete(
         });
     }
 
-    if next.to_usize() == 0 {
+    if next.addr() == 0 {
         tld_get_mut!(tld_ptr, local, tld => {
             let cq = tld.segments.span_queue_headers[sbin_idx];
             tld.segments.span_queue_headers.set(
@@ -441,7 +441,7 @@ fn span_queue_delete(
         let old_state = local.page_organization;
         local.page_organization = next_state;
 
-        if old(local).page_organization.pages[slice.page_id@].dlist_entry.get_Some_0().prev.is_Some() &&
+        /*if old(local).page_organization.pages[slice.page_id@].dlist_entry.get_Some_0().prev.is_Some() &&
             old(local).page_organization.pages[slice.page_id@].dlist_entry.get_Some_0().next.is_Some()
         {
             let old_p = old(local).page_organization.pages[slice.page_id@].dlist_entry.get_Some_0().prev.get_Some_0();
@@ -489,10 +489,10 @@ fn span_queue_delete(
                     assert(page_organization_pages_match_data(org_pages[page_id], pages[page_id], local.psa[page_id], page_id, local.page_organization.popped));
                 }
             }*/
-        }
+        }*/
 
-        let org_queues = local.page_organization.unused_dlist_headers;
-        let queues = local.tld@.value.get_Some_0().segments.span_queue_headers;
+        //let org_queues = local.page_organization.unused_dlist_headers;
+        //let queues = local.tld@.value.get_Some_0().segments.span_queue_headers;
         /*assert(is_page_ptr_opt(queues@[sbin_idx as int].first, org_queues[sbin_idx as int].first));
         assert(is_page_ptr_opt(queues@[sbin_idx as int].last, org_queues[sbin_idx as int].last));
         assert(page_organization_queues_match(org_queues, queues@));
@@ -560,14 +560,14 @@ fn segment_slice_split(
         first_in_queue = cq.first;
 
         cq.first = next_slice.page_ptr;
-        if first_in_queue.to_usize() == 0 {
+        if first_in_queue.addr() == 0 {
             cq.last = next_slice.page_ptr;
         }
 
         tld.segments.span_queue_headers.set(bin_idx, cq);
     });
 
-    if first_in_queue.to_usize() != 0 {
+    if first_in_queue.addr() != 0 {
         let first_in_queue_ptr = PagePtr { page_ptr: first_in_queue,
             page_id: Ghost(local.page_organization.unused_dlist_headers[bin_idx as int].first.get_Some_0()) };
         unused_page_get_mut_prev!(first_in_queue_ptr, local, p => {
@@ -583,7 +583,7 @@ fn segment_slice_split(
         inner.xblock_size = 0;
     });
     unused_page_get_mut_prev!(next_slice, local, p => {
-        p = PPtr::from_usize(0);
+        p = core::ptr::null_mut();
     });
     unused_page_get_mut_next!(next_slice, local, n => {
         n = first_in_queue;
@@ -619,7 +619,7 @@ fn segment_slice_split(
     proof {
         local.page_organization = next_state;
 
-        let page_id = slice.page_id@;
+        /*let page_id = slice.page_id@;
         let next_id = next_slice.page_id@;
         let last_page_id = PageId { idx: (page_id.idx + current_slice_count - 1) as nat, .. page_id };
 
@@ -628,12 +628,12 @@ fn segment_slice_split(
         let old_psa = old(local).psa;
 
         let org_pages = local.page_organization.pages;
-        let pages = local.pages;
+        let pages = local.pages;*/
         local.psa = local.psa.union_prefer_right(local.unused_pages);
-        let psa = local.psa;
+        //let psa = local.psa;
 
-        let old_org_queues = old(local).page_organization.unused_dlist_headers;
-        let old_queues = old(local).tld@.value.get_Some_0().segments.span_queue_headers;
+        //let old_org_queues = old(local).page_organization.unused_dlist_headers;
+        //let old_queues = old(local).tld@.value.get_Some_0().segments.span_queue_headers;
 
         //assert(page_organization_pages_match_data(org_pages[slice.page_id@], pages[slice.page_id@], psa[slice.page_id@], slice.page_id@, local.page_organization.popped));
 
@@ -770,9 +770,9 @@ fn segment_span_allocate(
     }
 
     let tracked mut first_psa = local.unused_pages.tracked_remove(first_page_id);
-    let mut page = slice.page_ptr.take(Tracked(&mut first_psa.points_to));
+    let mut page = ptr_mut_read(slice.page_ptr, Tracked(&mut first_psa.points_to));
     page.offset = 0;
-    slice.page_ptr.put(Tracked(&mut first_psa.points_to), page);
+    ptr_mut_write(slice.page_ptr, Tracked(&mut first_psa.points_to), page);
     proof {
         local.unused_pages.tracked_insert(first_page_id, first_psa);
     }
@@ -806,8 +806,8 @@ fn segment_span_allocate(
               #[trigger] first_page_id.range_from(1, extra + 1).contains(page_id) ==>
                   local.unused_pages.dom().contains(page_id)
                   && (local.unused_pages.dom().contains(page_id) ==>
-                    local.unused_pages[page_id].points_to@.value.is_some()
-                    && is_page_ptr(local.unused_pages[page_id].points_to@.pptr, page_id)),
+                    local.unused_pages[page_id].points_to.is_init()
+                    && is_page_ptr(local.unused_pages[page_id].points_to.ptr() as int, page_id)),
           forall |page_id|
               #[trigger] local.unused_pages.dom().contains(page_id) ==>
               (
@@ -815,7 +815,7 @@ fn segment_span_allocate(
                       psa_differ_only_in_offset(
                           local.unused_pages[page_id],
                           local_snapshot.unused_pages[page_id])
-                      && local.unused_pages[page_id].points_to@.value.unwrap().offset ==
+                      && local.unused_pages[page_id].points_to.value().offset ==
                           (page_id.idx - first_page_id.idx) * SIZEOF_PAGE_HEADER
                   } else {
                       local.unused_pages[page_id] == local_snapshot.unused_pages[page_id]
@@ -831,9 +831,9 @@ fn segment_span_allocate(
         //assert(i * SIZEOF_PAGE_HEADER <= SLICES_PER_SEGMENT * SIZEOF_PAGE_HEADER);
 
         let tracked mut this_psa = local.unused_pages.tracked_remove(this_page_id);
-        let mut page = this_slice.page_ptr.take(Tracked(&mut this_psa.points_to));
+        let mut page = ptr_mut_read(this_slice.page_ptr, Tracked(&mut this_psa.points_to));
         page.offset = i as u32 * SIZEOF_PAGE_HEADER as u32;
-        this_slice.page_ptr.put(Tracked(&mut this_psa.points_to), page);
+        ptr_mut_write(this_slice.page_ptr, Tracked(&mut this_psa.points_to), page);
         proof {
             local.unused_pages.tracked_insert(this_page_id, this_psa);
             assert_sets_equal!(local.unused_pages.dom() == prelocal.unused_pages.dom());
@@ -849,7 +849,7 @@ fn segment_span_allocate(
                       psa_differ_only_in_offset(
                           local.unused_pages[page_id],
                           local_snapshot.unused_pages[page_id])
-                      && local.unused_pages[page_id].points_to@.value.unwrap().offset ==
+                      && local.unused_pages[page_id].points_to.value().offset ==
                           page_id.idx - first_page_id.idx
                   } else {
                       local.unused_pages[page_id] == local_snapshot.unused_pages[page_id]
@@ -862,11 +862,11 @@ fn segment_span_allocate(
                           local_snapshot.unused_pages[page_id]));
                       if page_id.idx - first_page_id.idx == i - 1 {
                           assert(page_id == this_page_id);
-                          assert(local.unused_pages[this_page_id].points_to@.value.unwrap().offset == i - 1);
-                          assert(local.unused_pages[page_id].points_to@.value.unwrap().offset ==
+                          assert(local.unused_pages[this_page_id].points_to.value().offset == i - 1);
+                          assert(local.unused_pages[page_id].points_to.value().offset ==
                               page_id.idx - first_page_id.idx);
                       } else {
-                          assert(local.unused_pages[page_id].points_to@.value.unwrap().offset ==
+                          assert(local.unused_pages[page_id].points_to.value().offset ==
                               page_id.idx - first_page_id.idx);
                       }
                   } else {
@@ -1016,7 +1016,7 @@ fn segment_alloc(
     //assert(segment_start(segment_id) % vstd::layout::align_of::<SegmentHeader>() as int == 0);
     vstd::layout::layout_for_type_is_valid::<SegmentHeader>(); // $line_count$Proof$
 
-    let tracked mut seg_header_points_to = seg_header_points_to_raw.into_typed::<SegmentHeader>(segment_start(segment_id));
+    let tracked mut seg_header_points_to = seg_header_points_to_raw.into_typed::<SegmentHeader>(segment_start(segment_id) as usize);
     let allow_decommit = option_allow_decommit() && !is_pinned && !mem_large;
     let (pcell_main, Tracked(pointsto_main)) = PCell::new(SegmentHeaderMain {
         memid: memid,
@@ -1031,7 +1031,7 @@ fn segment_alloc(
         commit_mask: commit_mask,
     });
     let (pcell_main2, Tracked(pointsto_main2)) = PCell::new(SegmentHeaderMain2 {
-        next: PPtr::from_usize(0),
+        next: core::ptr::null_mut(),
         abandoned: 0,
         abandoned_visits: 0,
         used: 0,
@@ -1043,7 +1043,7 @@ fn segment_alloc(
     });
     let (cur_thread_id, Tracked(is_thread)) = crate::thread::thread_id();
     proof { local.is_thread.agrees(is_thread); }
-    segment_ptr.segment_ptr.put(Tracked(&mut seg_header_points_to), SegmentHeader {
+    ptr_mut_write(segment_ptr.segment_ptr, Tracked(&mut seg_header_points_to), SegmentHeader {
         main: pcell_main,
         abandoned_next: 0,
         main2: pcell_main2,
@@ -1058,9 +1058,9 @@ fn segment_alloc(
 
     //assert(segment_ptr.segment_ptr.id() + SEGMENT_SIZE < usize::MAX);
     let mut i: usize = 0;
-    let mut cur_page_ptr = PPtr::from_usize(
-        segment_ptr.segment_ptr.to_usize() + SIZEOF_SEGMENT_HEADER
-    );
+    let mut cur_page_ptr = segment_ptr.segment_ptr.with_addr(
+        segment_ptr.segment_ptr.addr() + SIZEOF_SEGMENT_HEADER
+    ) as *mut Page;
     //assert(i * SIZEOF_PAGE_HEADER == 0);
     let ghost old_mem_chunk = mem_chunk;
     let tracked mut psa_map = Map::<PageId, PageSharedAccess>::tracked_empty();
@@ -1072,15 +1072,15 @@ fn segment_alloc(
             //  COMMIT_SIZE - (SIZEOF_SEGMENT_HEADER + i * SIZEOF_PAGE_HEADER)),
             set_int_range(
                     segment_start(segment_id) + SIZEOF_SEGMENT_HEADER,
-                    segment_start(segment_id) + COMMIT_SIZE) <= old_mem_chunk.points_to@.dom(),
-            mem_chunk.points_to@.dom() =~= old_mem_chunk.points_to@.dom() - 
+                    segment_start(segment_id) + COMMIT_SIZE) <= old_mem_chunk.points_to.dom(),
+            mem_chunk.points_to.dom() =~= old_mem_chunk.points_to.dom() - 
                 set_int_range(
                     segment_start(segment_id),
                     segment_start(segment_id) + SIZEOF_SEGMENT_HEADER + i * SIZEOF_PAGE_HEADER
                 ),
 
-            cur_page_ptr.id() == segment_start(segment_id) + SIZEOF_SEGMENT_HEADER + i * SIZEOF_PAGE_HEADER,
-            segment_ptr.segment_ptr.id() + SEGMENT_SIZE < usize::MAX,
+            cur_page_ptr as int == segment_start(segment_id) + SIZEOF_SEGMENT_HEADER + i * SIZEOF_PAGE_HEADER,
+            segment_ptr.segment_ptr as int + SEGMENT_SIZE < usize::MAX,
             segment_ptr.wf(),
             segment_ptr.segment_id@ == segment_id,
             i <= SLICES_PER_SEGMENT + 1,
@@ -1105,21 +1105,21 @@ fn segment_alloc(
                     &&& pla_map[page_id].next@.value.is_some()
                     &&& pla_map[page_id].inner@.value.unwrap().zeroed()
                     &&& pla_map[page_id].count@.value.unwrap() == 0
-                    &&& pla_map[page_id].prev@.value.unwrap().id() == 0
-                    &&& pla_map[page_id].next@.value.unwrap().id() == 0
+                    &&& pla_map[page_id].prev@.value.unwrap() as int == 0
+                    &&& pla_map[page_id].next@.value.unwrap() as int == 0
 
-                    &&& is_page_ptr(psa_map[page_id].points_to@.pptr, page_id)
-                    &&& psa_map[page_id].points_to@.value.is_some()
-                    &&& psa_map[page_id].points_to@.value.unwrap().count.id() == pla_map[page_id].count@.pcell
-                    &&& psa_map[page_id].points_to@.value.unwrap().inner.id() == pla_map[page_id].inner@.pcell
-                    &&& psa_map[page_id].points_to@.value.unwrap().prev.id() == pla_map[page_id].prev@.pcell
-                    &&& psa_map[page_id].points_to@.value.unwrap().next.id() == pla_map[page_id].next@.pcell
-                    &&& psa_map[page_id].points_to@.value.unwrap().offset == 0
-                    &&& psa_map[page_id].points_to@.value.unwrap().xthread_free.is_empty()
-                    &&& psa_map[page_id].points_to@.value.unwrap().xthread_free.wf()
-                    &&& psa_map[page_id].points_to@.value.unwrap().xthread_free.instance
+                    &&& is_page_ptr(psa_map[page_id].points_to.ptr() as int, page_id)
+                    &&& psa_map[page_id].points_to.is_init()
+                    &&& psa_map[page_id].points_to.value().count.id() == pla_map[page_id].count@.pcell
+                    &&& psa_map[page_id].points_to.value().inner.id() == pla_map[page_id].inner@.pcell
+                    &&& psa_map[page_id].points_to.value().prev.id() == pla_map[page_id].prev@.pcell
+                    &&& psa_map[page_id].points_to.value().next.id() == pla_map[page_id].next@.pcell
+                    &&& psa_map[page_id].points_to.value().offset == 0
+                    &&& psa_map[page_id].points_to.value().xthread_free.is_empty()
+                    &&& psa_map[page_id].points_to.value().xthread_free.wf()
+                    &&& psa_map[page_id].points_to.value().xthread_free.instance
                           == local.instance
-                    &&& psa_map[page_id].points_to@.value.unwrap().xheap.is_empty()
+                    &&& psa_map[page_id].points_to.value().xheap.is_empty()
                 }
             }
     {
@@ -1144,7 +1144,7 @@ fn segment_alloc(
         vstd::layout::layout_for_type_is_valid::<Page>(); // $line_count$Proof$
         let tracked page_header_points_to_raw = mem_chunk.take_points_to_range(
             phstart, SIZEOF_PAGE_HEADER as int);
-        let tracked mut page_header_points_to = page_header_points_to_raw.into_typed::<Page>(phstart);
+        let tracked mut page_header_points_to = page_header_points_to_raw.into_typed::<Page>(phstart as usize);
         let (pcell_count, Tracked(pointsto_count)) = PCell::new(0);
         let (pcell_inner, Tracked(pointsto_inner)) = PCell::new(PageInner {
             flags0: 0,
@@ -1157,8 +1157,8 @@ fn segment_alloc(
             xblock_size: 0,
             local_free: LL::empty(),
         });
-        let (pcell_prev, Tracked(pointsto_prev)) = PCell::new(PPtr::from_usize(0));
-        let (pcell_next, Tracked(pointsto_next)) = PCell::new(PPtr::from_usize(0));
+        let (pcell_prev, Tracked(pointsto_prev)) = PCell::new(core::ptr::null_mut());
+        let (pcell_next, Tracked(pointsto_next)) = PCell::new(core::ptr::null_mut());
         let page = Page {
             count: pcell_count,
             offset: 0,
@@ -1175,7 +1175,7 @@ fn segment_alloc(
             prev: pointsto_prev,
             next: pointsto_next,
         };
-        cur_page_ptr.put(Tracked(&mut page_header_points_to), page);
+        ptr_mut_write(cur_page_ptr, Tracked(&mut page_header_points_to), page);
         let tracked psa = PageSharedAccess {
             points_to: page_header_points_to,
         };
@@ -1187,7 +1187,7 @@ fn segment_alloc(
         //assert(cur_page_ptr.id() + SIZEOF_PAGE_HEADER <= usize::MAX);
 
         i = i + 1;
-        cur_page_ptr = PPtr::from_usize(cur_page_ptr.to_usize() + SIZEOF_PAGE_HEADER);
+        cur_page_ptr = cur_page_ptr.with_addr(cur_page_ptr.addr() + SIZEOF_PAGE_HEADER);
 
         /*assert(psa_map.dom().contains(page_id));
         assert( pla_map.dom().contains(page_id));
@@ -1201,14 +1201,14 @@ fn segment_alloc(
         assert( pla_map[page_id].next@.value.unwrap().id() == 0);
 
         assert( is_page_ptr(psa_map[page_id].points_to@.pptr, page_id));
-        assert( psa_map[page_id].points_to@.value.is_some());
-        assert( psa_map[page_id].points_to@.value.unwrap().count.id() == pla_map[page_id].count@.pcell);
-        assert( psa_map[page_id].points_to@.value.unwrap().inner.id() == pla_map[page_id].inner@.pcell);
-        assert( psa_map[page_id].points_to@.value.unwrap().prev.id() == pla_map[page_id].prev@.pcell);
-        assert( psa_map[page_id].points_to@.value.unwrap().next.id() == pla_map[page_id].next@.pcell);
-        assert( psa_map[page_id].points_to@.value.unwrap().offset == 0);
-        assert( psa_map[page_id].points_to@.value.unwrap().xthread_free.is_empty());
-        assert( psa_map[page_id].points_to@.value.unwrap().xheap.is_empty());*/
+        assert( psa_map[page_id].points_to.is_init());
+        assert( psa_map[page_id].points_to.value().count.id() == pla_map[page_id].count@.pcell);
+        assert( psa_map[page_id].points_to.value().inner.id() == pla_map[page_id].inner@.pcell);
+        assert( psa_map[page_id].points_to.value().prev.id() == pla_map[page_id].prev@.pcell);
+        assert( psa_map[page_id].points_to.value().next.id() == pla_map[page_id].next@.pcell);
+        assert( psa_map[page_id].points_to.value().offset == 0);
+        assert( psa_map[page_id].points_to.value().xthread_free.is_empty());
+        assert( psa_map[page_id].points_to.value().xheap.is_empty());*/
 
     }
 
@@ -1246,7 +1246,7 @@ fn segment_alloc(
                 local.pages.index(page_id).wf_unused(page_id, local.unused_pages[page_id], local.page_organization.popped)
         by {
             if page_id.segment_id == segment_id {
-                assert(psa_map[page_id].points_to@.value.unwrap().wf_unused());
+                assert(psa_map[page_id].points_to.value().wf_unused());
                 assert(psa_map[page_id].wf_unused(page_id));
                 assert(pla_map.dom().contains(page_id));
                 assert(local.pages.index(page_id).wf_unused(page_id, local.unused_pages[page_id], local.page_organization.popped));
@@ -1255,7 +1255,7 @@ fn segment_alloc(
             }
         }*/
         //assert(i == SLICES_PER_SEGMENT + 1);
-        //assert(local.segments[segment_id].points_to@.value.unwrap().thread_id.wf(
+        //assert(local.segments[segment_id].points_to.value().thread_id.wf(
         //    local.instance, segment_id));
         /*assert(local.segments[segment_id].wf(segment_id,
                 local.thread_token@.value.segments.index(segment_id),
@@ -1295,7 +1295,8 @@ fn segment_alloc(
     }
 
     let first_slice = PagePtr {
-        page_ptr: PPtr::from_usize(segment_ptr.segment_ptr.to_usize() + SIZEOF_SEGMENT_HEADER),
+        page_ptr: segment_ptr.segment_ptr.with_addr(
+            segment_ptr.segment_ptr.addr() + SIZEOF_SEGMENT_HEADER) as *mut Page,
         page_id: Ghost(PageId { segment_id, idx: 0 }),
     };
     //assert(first_slice.wf());
@@ -1371,14 +1372,14 @@ fn segment_os_alloc(
         pdecommit_mask == old(pdecommit_mask), // this is only modified if segment cache is used
     ({
         let (segment_ptr, new_psegment_slices, new_ppre_size, new_pinfo_slices, is_zero, pcommit, mem_id, mem_large, is_pinned, align_offset, mem_chunk) = res; {
-        &&& (segment_ptr.segment_ptr.id() != 0 ==> {
+        &&& (segment_ptr.segment_ptr.addr() != 0 ==> {
             &&& segment_ptr.wf()
             &&& mem_chunk@.wf()
-            &&& mem_chunk@.os_exact_range(segment_ptr.segment_ptr.id(), SEGMENT_SIZE as int)
+            &&& mem_chunk@.os_exact_range(segment_ptr.segment_ptr as int, SEGMENT_SIZE as int)
             &&& set_int_range(segment_start(segment_ptr.segment_id@),
                     segment_start(segment_ptr.segment_id@) + COMMIT_SIZE).subset_of( pcommit_mask.bytes(segment_ptr.segment_id@) )
             &&& pcommit_mask.bytes(segment_ptr.segment_id@).subset_of(mem_chunk@.os_rw_bytes())
-            &&& mem_chunk@.os_rw_bytes().subset_of(mem_chunk@.points_to@.dom())
+            &&& mem_chunk@.os_rw_bytes().subset_of(mem_chunk@.points_to.dom())
         })
         }
     })
@@ -1420,7 +1421,7 @@ fn segment_os_alloc(
           arena_alloc_aligned(
             segment_size, alignment, align_offset, request_commit, mem_large, req_arena_id);
         segment = SegmentPtr {
-            segment_ptr: PPtr::from_usize(_segment),
+            segment_ptr: _segment as *mut SegmentHeader,
             segment_id: Ghost(mk_segment_id(_segment as int)),
         };
         mem_id = _mem_id;
@@ -1451,7 +1452,7 @@ fn segment_os_alloc(
         //assert(commit_needed as int * COMMIT_SIZE as int <= segment_size);
 
         let (success, is_zero) = crate::os_commit::os_commit(
-            segment.segment_ptr.to_usize(),
+            segment.segment_ptr.addr(),
             commit_needed * COMMIT_SIZE as usize,
             Tracked(&mut mem));
         if !success {
@@ -1479,7 +1480,7 @@ fn segment_os_alloc(
         by {
             reveal(CommitMask::bytes);
         }
-        assert(mem.os_rw_bytes().subset_of(mem.points_to@.dom()));
+        assert(mem.os_rw_bytes().subset_of(mem.points_to.dom()));
     }
 
     return (segment, psegment_slices, pre_size, pinfo_slices, is_zero, pcommit, mem_id, mem_large, is_pinned, align_offset, Tracked(mem));
@@ -1683,13 +1684,13 @@ fn segment_span_free(
         first_in_queue = cq.first;
 
         cq.first = slice.page_ptr;
-        if first_in_queue.to_usize() == 0 {
+        if first_in_queue.addr() == 0 {
             cq.last = slice.page_ptr;
         }
 
         tld.segments.span_queue_headers.set(bin_idx, cq);
     });
-    if first_in_queue.to_usize() != 0 {
+    if first_in_queue.addr() != 0 {
         let first_in_queue_ptr = PagePtr { page_ptr: first_in_queue,
             page_id: Ghost(local.page_organization.unused_dlist_headers[bin_idx as int].first.get_Some_0()) };
         unused_page_get_mut_prev!(first_in_queue_ptr, local, p => {
@@ -1697,7 +1698,7 @@ fn segment_span_free(
         });
     }
     unused_page_get_mut_prev!(slice, local, p => {
-        p = PPtr::from_usize(0);
+        p = core::ptr::null_mut();
     });
     unused_page_get_mut_next!(slice, local, n => {
         n = first_in_queue;
@@ -1734,9 +1735,9 @@ fn segment_span_free(
                     assert(org_pages[pid].offset.is_some());
                     assert(org_pages[pid].offset.unwrap() == (slice_count - 1));
                     assert(
-                        psa[pid].points_to@.value.unwrap().offset ==
+                        psa[pid].points_to.value().offset ==
                         (slice_count as u32 - 1) * SIZEOF_PAGE_HEADER as u32);
-                    assert(psa[pid].points_to@.value.unwrap().offset ==
+                    assert(psa[pid].points_to.value().offset ==
                         (slice_count - 1) * SIZEOF_PAGE_HEADER);
                     assert(page_organization_pages_match_data(org_pages[pid], pages[pid], psa[pid]));
                 } else {
@@ -1852,7 +1853,7 @@ fn segment_page_clear(page: PagePtr, tld: TldPtr, Tracked(local): Tracked<&mut L
     let tracked checked_tok = local.take_checked_token();
     let tracked perm = &local.instance.thread_local_state_guards_page(
                 local.thread_id, page.page_id@, &local.thread_token).points_to;
-    let Tracked(checked_tok) = page.page_ptr.borrow(Tracked(perm)).xthread_free.check_is_good(
+    let Tracked(checked_tok) = ptr_ref(page.page_ptr, Tracked(perm)).xthread_free.check_is_good(
         Tracked(&local.thread_token),
         Tracked(checked_tok));
     proof {
@@ -2070,12 +2071,12 @@ fn segment_span_free_coalesce(slice: PagePtr, tld: TldPtr, Tracked(local): Track
         let n_count = page.get_count(Tracked(&*local));
         let sbin_idx = slice_bin(n_count as usize);
 
-        if prev_ptr.to_usize() != 0 {
+        if prev_ptr.addr() != 0 {
             unused_page_get_mut_next!(prev, local, n => {
                 n = next_ptr;
             });
         }
-        if next_ptr.to_usize() != 0 {
+        if next_ptr.addr() != 0 {
             unused_page_get_mut_prev!(next, local, p => {
                 p = prev_ptr;
             });
@@ -2084,10 +2085,10 @@ fn segment_span_free_coalesce(slice: PagePtr, tld: TldPtr, Tracked(local): Track
         tld_get_mut!(tld, local, tld => {
             let mut cq = tld.segments.span_queue_headers[sbin_idx];
 
-            if prev_ptr.to_usize() == 0 {
+            if prev_ptr.addr() == 0 {
                 cq.first = next_ptr;
             }
-            if next_ptr.to_usize() == 0 {
+            if next_ptr.addr() == 0 {
                 cq.last = prev_ptr;
             }
 
@@ -2187,7 +2188,7 @@ fn segment_span_free_coalesce_before(segment: SegmentPtr, slice: PagePtr, tld: T
             Ghost(page_id));
         let page = PagePtr { page_ptr, page_id: Ghost(page_id) };
         proof { 
-            is_page_ptr_nonzero(page_ptr.id(), page_id);
+            is_page_ptr_nonzero(page_ptr as int, page_id);
             //assert(page.wf());
         }
         if page.get_inner_ref(Tracked(&*local)).xblock_size == 0 {
@@ -2209,12 +2210,12 @@ fn segment_span_free_coalesce_before(segment: SegmentPtr, slice: PagePtr, tld: T
             let n_count = page.get_count(Tracked(&*local));
             let sbin_idx = slice_bin(n_count as usize);
 
-            if prev_ptr.to_usize() != 0 {
+            if prev_ptr.addr() != 0 {
                 unused_page_get_mut_next!(prev, local, n => {
                     n = next_ptr;
                 });
             }
-            if next_ptr.to_usize() != 0 {
+            if next_ptr.addr() != 0 {
                 unused_page_get_mut_prev!(next, local, p => {
                     p = prev_ptr;
                 });
@@ -2223,10 +2224,10 @@ fn segment_span_free_coalesce_before(segment: SegmentPtr, slice: PagePtr, tld: T
             tld_get_mut!(tld, local, tld => {
                 let mut cq = tld.segments.span_queue_headers[sbin_idx];
 
-                if prev_ptr.to_usize() == 0 {
+                if prev_ptr.addr() == 0 {
                     cq.first = next_ptr;
                 }
-                if next_ptr.to_usize() == 0 {
+                if next_ptr.addr() == 0 {
                     cq.last = prev_ptr;
                 }
 

@@ -2,7 +2,7 @@
 
 use state_machines_macros::*;
 use vstd::prelude::*;
-use vstd::ptr::*;
+use vstd::raw_ptr::*;
 use vstd::modes::*;
 use vstd::*;
 use vstd::set_lib::*;
@@ -38,7 +38,7 @@ verus!{
 #[repr(C)]
 #[derive(Copy)]
 pub struct Node {
-    pub ptr: PPtr<Node>,
+    pub ptr: *mut Node,
 }
 
 impl Clone for Node {
@@ -66,7 +66,7 @@ pub ghost struct LLData {
 }
 
 pub struct LL {
-    first: PPtr<Node>,
+    first: *mut Node,
 
     data: Ghost<LLData>,
 
@@ -83,31 +83,31 @@ pub tracked struct LLGhostStateToReconvene {
 }
 
 impl LL {
-    pub closed spec fn next_ptr(&self, i: nat) -> int {
+    pub closed spec fn next_ptr(&self, i: nat) -> *mut Node {
         if i == 0 {
-            0
+            core::ptr::null_mut()
         } else {
-            self.perms@.index((i - 1) as nat).0@.pptr
+            self.perms@.index((i - 1) as nat).0.ptr()
         }
     }
 
-    pub closed spec fn valid_node(&self, i: nat, next_ptr: int) -> bool {
+    pub closed spec fn valid_node(&self, i: nat, next_ptr: *mut Node) -> bool {
         0 <= i < self.data@.len ==> (
             self.perms@.dom().contains(i) && {
                   let (perm, padding, block_token) = self.perms@.index(i);
 
                   // Each node points to the next node
-                  perm@.value.is_some()
-                  && perm@.value.unwrap().ptr.id() == next_ptr
+                  perm.is_init()
+                  && perm.value().ptr == next_ptr
 
                   // The PointsToRaw makes up the rest of the block size allocation
                   && block_token@.key.block_size - size_of::<Node>() >= 0
-                  && padding.is_range(perm@.pptr + size_of::<Node>(),
+                  && padding.is_range(perm.ptr().addr() + size_of::<Node>(),
                       block_token@.key.block_size - size_of::<Node>())
 
                   // block_token is correct
                   && block_token@.instance == self.data@.instance
-                  && is_block_ptr(perm@.pptr, block_token@.key)
+                  && is_block_ptr(perm.ptr() as int, block_token@.key)
 
                   && (self.data@.fixed_page ==> (
                       block_token@.key.page_id == self.data@.page_id
@@ -124,7 +124,7 @@ impl LL {
 
     pub closed spec fn wf(&self) -> bool {
         &&& (forall |i: nat| self.perms@.dom().contains(i) ==> 0 <= i < self.data@.len)
-        &&& self.first.id() == self.next_ptr(self.data@.len)
+        &&& self.first == self.next_ptr(self.data@.len)
         &&& (forall |i: nat| self.valid_node(i, #[trigger] self.next_ptr(i)))
     }
 
@@ -152,7 +152,7 @@ impl LL {
         self.data@.heap_id
     }
 
-    pub closed spec fn ptr(&self) -> PPtr<Node> {
+    pub closed spec fn ptr(&self) -> *mut Node {
         self.first
     }
 
@@ -163,12 +163,12 @@ impl LL {
     }*/
 
     #[inline(always)]
-    pub fn insert_block(&mut self, ptr: PPtr<u8>, Tracked(points_to_raw): Tracked<PointsToRaw>, Tracked(block_token): Tracked<Mim::block>)
+    pub fn insert_block(&mut self, ptr: *mut u8, Tracked(points_to_raw): Tracked<PointsToRaw>, Tracked(block_token): Tracked<Mim::block>)
         requires old(self).wf(),
-            points_to_raw.is_range(ptr.id(), block_token@.key.block_size as int),
-            //old(self).is_valid_page_address(points_to_raw@.pptr),
+            points_to_raw.is_range(ptr as int, block_token@.key.block_size as int),
+            //old(self).is_valid_page_address(points_to_raw.ptr()),
             block_token@.instance == old(self).instance(),
-            is_block_ptr(ptr.id(), block_token@.key),
+            is_block_ptr(ptr as int, block_token@.key),
             old(self).fixed_page() ==> (
                 block_token@.key.page_id == old(self).page_id()
                 && block_token@.key.block_size == old(self).block_size()
@@ -190,13 +190,13 @@ impl LL {
             block_size_ge_word();
             block_ptr_aligned_to_word();
 
-            let tracked (m1, m2) = points_to_raw.split(set_int_range(ptr.id(), ptr.id() + size_of::<Node>() as int));
-            mem1 = m1.into_typed::<Node>(ptr.id());
+            let tracked (m1, m2) = points_to_raw.split(set_int_range(ptr as int, ptr as int + size_of::<Node>() as int));
+            mem1 = m1.into_typed::<Node>(ptr.addr());
             mem2 = m2;
         }
 
-        let ptr = PPtr::<Node>::from_usize(ptr.to_usize());
-        ptr.put(Tracked(&mut mem1), Node { ptr: self.first });
+        let ptr = ptr as *mut Node;
+        ptr_mut_write(ptr, Tracked(&mut mem1), Node { ptr: self.first });
         self.first = ptr;
 
         proof {
@@ -244,23 +244,23 @@ impl LL {
 
     pub proof fn ghost_insert_block(
         tracked &mut self,
-        tracked ptr: PPtr<Node>,
+        tracked ptr: *mut Node,
         tracked points_to_ptr: PointsTo<Node>,
         tracked points_to_raw: PointsToRaw,
         tracked block_token: Mim::block,
      )
         requires old(self).wf(),
             block_token@.instance == old(self).instance(),
-            is_block_ptr(ptr.id(), block_token@.key),
+            is_block_ptr(ptr as int, block_token@.key),
 
             // Require that the pointer has already been written:
-            points_to_ptr@.pptr == ptr.id(),
-            points_to_ptr@.value.is_Some(),
-            points_to_ptr@.value.get_Some_0().ptr.id() == old(self).ptr().id(),
+            points_to_ptr.ptr() == ptr,
+            points_to_ptr.is_init(),
+            points_to_ptr.value().ptr == old(self).ptr(),
 
             // Require the padding to be correct
             points_to_raw.is_range(
-                ptr.id() + size_of::<Node>(),
+                ptr as int + size_of::<Node>(),
                 block_token@.key.block_size - size_of::<Node>()),
             block_token@.key.block_size - size_of::<Node>() >= 0,
 
@@ -321,9 +321,9 @@ impl LL {
 
     proof fn is_empty_iff_null(tracked &self)
         requires self.wf(),
-        ensures self.len() == 0 <==> self.first.id() == 0
+        ensures self.len() == 0 <==> self.first.addr() == 0
     {
-        if self.first.id() == 0 {
+        if self.first.addr() == 0 {
             if self.len() != 0 {
                 let n = (self.len() - 1) as nat;
                 assert(self.valid_node(n, self.next_ptr(n)));
@@ -343,11 +343,11 @@ impl LL {
         proof {
             self.is_empty_iff_null();
         }
-        self.first.to_usize() == 0
+        self.first.addr() == 0
     }
 
     #[inline(always)]
-    pub fn pop_block(&mut self) -> (x: (PPtr<u8>, Tracked<PointsToRaw>, Tracked<Mim::block>))
+    pub fn pop_block(&mut self) -> (x: (*mut u8, Tracked<PointsToRaw>, Tracked<Mim::block>))
         requires old(self).wf(),
             old(self).len() != 0,
         ensures ({
@@ -361,10 +361,10 @@ impl LL {
                 &&& self.fixed_page() == old(self).fixed_page()
                 &&& self.heap_id() == old(self).heap_id()
 
-                &&& points_to@.is_range(ptr.id(), block_token@@.key.block_size as int)
+                &&& points_to@.is_range(ptr as int, block_token@@.key.block_size as int)
 
                 &&& block_token@@.instance == old(self).instance()
-                &&& is_block_ptr(ptr.id(), block_token@@.key)
+                &&& is_block_ptr(ptr as int, block_token@@.key)
 
                 &&& (self.fixed_page() ==> (
                     block_token@@.key.page_id == self.page_id()
@@ -384,11 +384,11 @@ impl LL {
         let tracked (mut points_to_node, points_to_raw, block) = self.perms.borrow_mut().tracked_remove((self.data@.len - 1) as nat);
 
         let ptr = self.first;
-        let node = ptr.take(Tracked(&mut points_to_node));
+        let node = ptr_mut_read(ptr, Tracked(&mut points_to_node));
         self.first = node.ptr;
 
         let tracked points_to_raw = points_to_node.into_raw().join(points_to_raw);
-        let ptru = PPtr::<u8>::from_usize(ptr.to_usize());
+        let ptru = ptr as *mut u8;
 
         proof {
             self.data@.len = (self.data@.len - 1) as nat;
@@ -423,26 +423,26 @@ impl LL {
     // helper for clients using ghost_insert_block
 
     #[inline(always)]
-    pub fn block_write_ptr(ptr: PPtr<Node>, Tracked(perm): Tracked<PointsToRaw>, next: PPtr<Node>)
+    pub fn block_write_ptr(ptr: *mut Node, Tracked(perm): Tracked<PointsToRaw>, next: *mut Node)
         -> (res: (Tracked<PointsTo<Node>>, Tracked<PointsToRaw>))
         requires
-            perm.contains_range(ptr.id(), size_of::<Node>() as int),
-            ptr.id() % align_of::<crate::linked_list::Node>() as int == 0,
+            perm.contains_range(ptr as int, size_of::<Node>() as int),
+            ptr as int % align_of::<crate::linked_list::Node>() as int == 0,
         ensures ({
             let points_to = res.0@;
             let points_to_raw = res.1@;
 
-            points_to@.pptr == ptr.id()
-              && points_to@.value == Some(Node { ptr: next })
+            points_to.ptr() == ptr
+              && points_to.opt_value() == MemContents::Init(Node { ptr: next })
 
-              && points_to_raw@ == perm@.remove_keys(set_int_range(ptr.id(), ptr.id() + size_of::<Node>()))
+              && points_to_raw.dom() == perm.dom().difference(set_int_range(ptr as int, ptr as int + size_of::<Node>()))
         }),
     {
-        let tracked (points_to, rest) = perm.split(set_int_range(ptr.id(), ptr.id() + size_of::<Node>()));
+        let tracked (points_to, rest) = perm.split(set_int_range(ptr as int, ptr as int + size_of::<Node>()));
         
         vstd::layout::layout_for_type_is_valid::<Node>(); // $line_count$Proof$
-        let tracked mut points_to_node = points_to.into_typed::<Node>(ptr.id());
-        ptr.put(Tracked(&mut points_to_node), Node { ptr: next });
+        let tracked mut points_to_node = points_to.into_typed::<Node>(ptr.addr());
+        ptr_mut_write(ptr, Tracked(&mut points_to_node), Node { ptr: next });
         (Tracked(points_to_node), Tracked(rest))
     }
 
@@ -462,7 +462,7 @@ impl LL {
             ll.len() == 0,
     {
         LL {
-            first: PPtr::from_usize(0),
+            first: core::ptr::null_mut(),
             data: Ghost(LLData {
                 fixed_page, block_size, page_id, instance, len: 0, heap_id,
             }),
@@ -546,7 +546,7 @@ impl LL {
         proof {
             other.is_empty_iff_null();
         }
-        if other.first.to_usize() == 0 {
+        if other.first.addr() == 0 {
             return 0;
         }
 
@@ -557,10 +557,10 @@ impl LL {
                 1 <= count <= other.len(),
                 other.len() < u32::MAX,
                 other.wf(),
-                p.id() == other.perms@[(other.len() - count) as nat].0@.pptr,
+                p == other.perms@[(other.len() - count) as nat].0.ptr(),
             ensures
                 count == other.len(),
-                p.id() == other.perms@[0].0@.pptr,
+                p == other.perms@[0].0.ptr(),
         {
             proof {
                 let ghost i = (other.len() - count) as nat;
@@ -572,8 +572,8 @@ impl LL {
                 }
             }
 
-            let next = *p.borrow(Tracked(&other.perms.borrow().tracked_borrow((other.len() - count) as nat).0));
-            if next.ptr.to_usize() != 0 {
+            let next = *ptr_ref(p, Tracked(&other.perms.borrow().tracked_borrow((other.len() - count) as nat).0));
+            if next.ptr.addr() != 0 {
                 count += 1;
                 p = next.ptr;
             } else {
@@ -587,8 +587,8 @@ impl LL {
         assert(other.valid_node(0, other.next_ptr(0)));
         let tracked mut perm = other.perms.borrow_mut().tracked_remove(0);
         let tracked (mut a, b, c) = perm;
-        let _ = p.take(Tracked(&mut a));
-        p.put(Tracked(&mut a), Node { ptr: self.first });
+        let _ = ptr_mut_read(p, Tracked(&mut a));
+        ptr_mut_write(p, Tracked(&mut a), Node { ptr: self.first });
 
         proof {
             other.perms.borrow_mut().tracked_insert(0, (a, b, c));
@@ -620,7 +620,7 @@ impl LL {
         }
 
         self.first = other.first;
-        other.first = PPtr::from_usize(0);
+        other.first = core::ptr::null_mut();
 
         proof {
             assert forall |i: nat| self.valid_node(i, #[trigger] self.next_ptr(i))
@@ -666,8 +666,8 @@ impl LL {
     #[inline(always)]
     pub fn prepend_contiguous_blocks(
         &mut self,
-        start: PPtr<u8>,
-        last: PPtr<u8>,
+        start: *mut u8,
+        last: *mut u8,
         bsize: usize,
 
         Ghost(cap): Ghost<nat>,     // current capacity
@@ -682,19 +682,19 @@ impl LL {
             old(self).block_size() == bsize as nat,
             old(self).heap_id().is_none(),
             INTPTR_SIZE <= bsize,
-            start.id() % INTPTR_SIZE as int == 0,
+            start as int % INTPTR_SIZE as int == 0,
             bsize as int % INTPTR_SIZE as int == 0,
 
             old(points_to_raw_r).is_range(
-                start.id(),
+                start as int,
                 extend as int * bsize as int),
-            start.id() + extend * bsize <= usize::MAX,
+            start as int + extend * bsize <= usize::MAX,
 
-            start.id() ==
+            start as int ==
                 block_start_at(old(self).page_id(), old(self).block_size() as int, cap as int),
 
             extend >= 1,
-            last.id() == start.id() + ((extend as int - 1) * bsize as int),
+            last as int == start as int + ((extend as int - 1) * bsize as int),
 
             (forall |i: int| cap <= i < cap + extend ==> old(tokens).dom().contains(i)),
             (forall |i: int| cap <= i < cap + extend ==> old(tokens).index(i)@.instance == old(self).instance()),
@@ -715,27 +715,27 @@ impl LL {
 
             self.len() == old(self).len() + extend,
 
-            //points_to_raw@.pptr == old(points_to_raw)@.pptr + extend * (bsize as int),
+            //points_to_raw.ptr() == old(points_to_raw).ptr() + extend * (bsize as int),
             //points_to_raw@.size == old(points_to_raw)@.size - extend * (bsize as int),
             tokens == old(tokens).remove_keys(
                 set_int_range(cap as int, cap as int + extend)),
     {
         // based on mi_page_free_list_extend
 
-        let tracked mut points_to_raw = PointsToRaw::empty();
+        let tracked mut points_to_raw = PointsToRaw::empty(start@.provenance);
         let tracked mut new_map: Map<nat, (PointsTo<Node>, PointsToRaw, Mim::block)> = Map::tracked_empty();
         proof {
             tracked_swap(&mut points_to_raw, points_to_raw_r);
         }
 
-        let mut block = start.to_usize();
+        let mut block = start.addr();
         let ghost mut i: int = 0;
         let ghost tokens_snap = *tokens;
-        while block < last.to_usize()
+        while block < last.addr()
             invariant 0 <= i < extend,
-              start.id() + extend * bsize <= usize::MAX,
-              block == start.id() + i * bsize,
-              last.id() == start.id() + (extend - 1) * bsize,
+              start as int + extend * bsize <= usize::MAX,
+              block == start as int + i * bsize,
+              last as int == start.addr() + (extend - 1) * bsize,
               points_to_raw.is_range(block as int, (extend - i) * bsize),
               INTPTR_SIZE as int <= bsize,
               block as int % INTPTR_SIZE as int == 0,
@@ -756,11 +756,11 @@ impl LL {
                 ((self.data@.len + extend - i <= j < self.data@.len + extend)
                     ==> { let k = self.data@.len + extend - 1 - j; {
                       &&& new_map[j].2 == tokens_snap[cap + k]
-                      &&& new_map[j].0@.pptr == start.id() + k * bsize
-                      &&& new_map[j].0@.value.is_some()
-                      &&& new_map[j].0@.value.unwrap().ptr.id() == start.id() + (k+1) * bsize
+                      &&& new_map[j].0.ptr() as int == start as int + k * bsize
+                      &&& new_map[j].0.is_init()
+                      &&& new_map[j].0.value().ptr as int == start.addr() + (k+1) * bsize
                       &&& new_map[j].1.is_range(
-                         start.id() + k * bsize + size_of::<Node>(),
+                         start.addr() + k * bsize + size_of::<Node>(),
                          bsize - size_of::<Node>())
                 }})
         {
@@ -773,21 +773,21 @@ impl LL {
                     by(nonlinear_arith) requires bsize >= 0, extend - i >= 1;
                 assert(i * bsize + bsize <= extend * bsize)
                     by(nonlinear_arith) requires bsize >= 0, extend - i >= 1;
-                assert(block + bsize <= start.id() + extend * bsize);
+                assert(block + bsize <= start as int + extend * bsize);
                 assert(size_of::<Node>() == 8);
             }
 
-            let next: PPtr<Node> = PPtr::from_usize(block + bsize);
+            let next: *mut Node = start.with_addr(block + bsize) as *mut Node;
 
             let tracked (points_to, rest) = points_to_raw.split(set_int_range(block as int, block as int + bsize as int));
             let tracked (points_to1, points_to2) = points_to.split(set_int_range(block as int, block as int + size_of::<Node>() as int));
             vstd::layout::layout_for_type_is_valid::<Node>(); // $line_count$Proof$
-            let tracked mut points_to_node = points_to1.into_typed::<Node>(block as int);
+            let tracked mut points_to_node = points_to1.into_typed::<Node>(block);
 
-            let block_ptr = PPtr::from_usize(block);
-            block_ptr.put(Tracked(&mut points_to_node), Node { ptr: next });
+            let block_ptr = next.with_addr(block);
+            ptr_mut_write(block_ptr, Tracked(&mut points_to_node), Node { ptr: next });
 
-            block = next.to_usize();
+            block = next.addr();
 
             proof {
                 points_to_raw = rest;
@@ -806,10 +806,10 @@ impl LL {
                     (self.data@.len + extend - i <= j < self.data@.len + extend)
                         implies ({ let k = self.data@.len + extend - 1 - j; {
                           &&& new_map[j].2 == tokens_snap[cap + k]
-                          &&& new_map[j].0@.pptr == start.id() + k * bsize
+                          &&& new_map[j].0.ptr() == start.id() + k * bsize
                           &&& new_map[j].0@.value.is_some()
                           &&& new_map[j].0@.value.unwrap().ptr.id() == start.id() + (k+1) * bsize
-                          &&& new_map[j].1@.pptr == start.id() + k * bsize + size_of::<Node>()
+                          &&& new_map[j].1.ptr() == start.id() + k * bsize + size_of::<Node>()
                           &&& new_map[j].1@.size == bsize - size_of::<Node>()
                     }})
                 by
@@ -822,17 +822,17 @@ impl LL {
                         assert(new_map[j].2 == old_tokens[cap + i - 1]);
                         assert(old_tokens[cap + i - 1] == tokens_snap[cap + i - 1]);
                         assert(new_map[j].2 == tokens_snap[cap + k]);
-                        assert(new_map[j].0@.pptr == start.id() + k * bsize);
+                        assert(new_map[j].0.ptr() == start.id() + k * bsize);
                         assert(new_map[j].0@.value.is_some());
                         assert(new_map[j].0@.value.unwrap().ptr.id() == start.id() + (k+1) * bsize);
-                        assert(new_map[j].1@.pptr == start.id() + k * bsize + size_of::<Node>());
+                        assert(new_map[j].1.ptr() == start.id() + k * bsize + size_of::<Node>());
                         assert(new_map[j].1@.size == bsize - size_of::<Node>());
                     } else {
                         assert(new_map[j].2 == tokens_snap[cap + k]);
-                        assert(new_map[j].0@.pptr == start.id() + k * bsize);
+                        assert(new_map[j].0.ptr() == start.id() + k * bsize);
                         assert(new_map[j].0@.value.is_some());
                         assert(new_map[j].0@.value.unwrap().ptr.id() == start.id() + (k+1) * bsize);
-                        assert(new_map[j].1@.pptr == start.id() + k * bsize + size_of::<Node>());
+                        assert(new_map[j].1.ptr() == start.id() + k * bsize + size_of::<Node>());
                         assert(new_map[j].1@.size == bsize - size_of::<Node>());
                     }
                 }*/
@@ -845,7 +845,7 @@ impl LL {
             by(nonlinear_arith) requires bsize >= 0, extend - i >= 1;
         assert(i * bsize + bsize <= extend * bsize)
             by(nonlinear_arith) requires bsize >= 0, extend - i >= 1;
-        assert(block + bsize <= start.id() + extend * bsize);
+        assert(block + bsize <= start as int + extend * bsize);
         assert(i == extend - 1) by {
             if i < extend - 1 {
                 assert(i * bsize < (extend as int - 1) * bsize)
@@ -858,12 +858,12 @@ impl LL {
         let tracked (points_to1, points_to2) = points_to.split(set_int_range(block as int, block as int + size_of::<Node>() as int));
         proof { points_to_raw = rest; }
         vstd::layout::layout_for_type_is_valid::<Node>(); // $line_count$Proof$
-        let tracked mut points_to_node = points_to1.into_typed::<Node>(block as int);
+        let tracked mut points_to_node = points_to1.into_typed::<Node>(block);
 
-        let block_ptr = PPtr::from_usize(block);
-        block_ptr.put(Tracked(&mut points_to_node), Node { ptr: self.first });
+        let block_ptr = start.with_addr(block) as *mut Node;
+        ptr_mut_write(block_ptr, Tracked(&mut points_to_node), Node { ptr: self.first });
 
-        self.first = PPtr::from_usize(start.to_usize());
+        self.first = start as *mut Node;
 
         proof {
             let tracked block = tokens.tracked_remove(cap + i);
@@ -914,12 +914,12 @@ impl LL {
                     let next_ptr = self.next_ptr(j);
 
                     assert(block_token@.key.block_size == bsize);
-                    assert(is_block_ptr(perm@.pptr, block_token@.key)) by {
+                    assert(is_block_ptr(perm.ptr() as int, block_token@.key)) by {
                         let block_id = block_token@.key;
                         crate::layout::get_block_start_defn(block_id);
                         let k = old_len + extend - 1 - j;
                         crate::layout::block_start_at_diff(block_id.page_id, bsize as nat, cap as nat, (cap + k) as nat);
-                        //assert(perm@.pptr == block_start(old(tokens).index(k)@.key));
+                        //assert(perm.ptr() == block_start(old(tokens).index(k)@.key));
                         //assert(is_block_ptr(
                             //block_start(old(tokens).index(i)@.key),
                             //old(tokens).index(i)@.key)
@@ -933,9 +933,9 @@ impl LL {
                             assert(self.perms@.index((j - 1) as nat)
                                 == old(self).perms@.index((j - 1) as nat));
                         }
-                        assert(perm@.value.unwrap().ptr.id() == next_ptr);
+                        assert(perm.value().ptr == next_ptr);
                     } else {
-                        assert(perm@.value.unwrap().ptr.id() == next_ptr);
+                        assert(perm.value().ptr == next_ptr);
                     }
 
                     //assert(padding@.size + size_of::<Node>() == block_token@.key.block_size);
@@ -963,7 +963,7 @@ impl LL {
                 self.valid_node(i, self.next_ptr(i)));
         }
 
-        self.first = PPtr::from_usize(0);
+        self.first = core::ptr::null_mut();
 
         let ghost block_size = self.block_size();
         let ghost page_id = self.page_id();
@@ -981,10 +981,10 @@ impl LL {
                   let (perm, padding, block_token) = m[i];
                     perm@.value.is_some()
                     && block_token@.key.block_size - size_of::<Node>() >= 0
-                    && padding.is_range(perm@.pptr + size_of::<Node>(),
+                    && padding.is_range(perm.ptr() + size_of::<Node>(),
                         block_token@.key.block_size - size_of::<Node>())
                     && block_token@.instance == instance
-                    && is_block_ptr(perm@.pptr, block_token@.key)
+                    && is_block_ptr(perm.ptr(), block_token@.key)
                     && block_token@.key.page_id == page_id
                     && block_token@.key.block_size == block_size
               }))*/
@@ -1019,12 +1019,12 @@ impl LL {
             forall |i: nat| (#[trigger] m.dom().contains(i) <==> 0 <= i < len)
               && (m.dom().contains(i) ==> ({
                   let (perm, padding, block_token) = m[i];
-                    perm@.value.is_some()
+                    perm.is_init()
                     && block_token@.key.block_size - size_of::<Node>() >= 0
-                    && padding.is_range(perm@.pptr + size_of::<Node>(),
+                    && padding.is_range(perm.ptr() as int + size_of::<Node>(),
                         block_token@.key.block_size - size_of::<Node>())
                     && block_token@.instance == instance
-                    && is_block_ptr(perm@.pptr, block_token@.key)
+                    && is_block_ptr(perm.ptr() as int, block_token@.key)
                     && block_token@.key.page_id == page_id
                     && block_token@.key.block_size == block_size
               }))
@@ -1054,7 +1054,7 @@ impl LL {
             assert(m.dom().contains(i));
             let tracked (mut perm, padding, block_token) = m.tracked_remove(i);
             let tracked mut m2 = Self::convene_pt_map(m, i, instance, page_id, block_size);
-            crate::layout::get_block_start_from_is_block_ptr(perm@.pptr, block_token@.key);
+            crate::layout::get_block_start_from_is_block_ptr(perm.ptr() as int, block_token@.key);
             perm.leak_contents();
             let tracked mut permraw = perm.into_raw();
             let tracked ptraw = permraw.join(padding);
@@ -1123,7 +1123,7 @@ impl LL {
             proof_from_false()
         } else {
             let tracked LLGhostStateToReconvene { map, .. } = llgstr;
-            Self::reconvene_rec(map, map.len(), llgstr.instance, llgstr.page_id, llgstr.block_size)
+            Self::reconvene_rec(map, map.len(), llgstr.instance, llgstr.page_id, llgstr.block_size, Provenance::null())
         }
     }
 
@@ -1201,6 +1201,7 @@ impl LL {
         instance: Mim::Instance,
         page_id: PageId,
         block_size: nat,
+        provenance: Provenance,
     ) -> (tracked res: (PointsToRaw, Map<BlockId, Mim::block>))
         requires
             forall |j: nat| 0 <= j < len ==> #[trigger] has_idx(m, j),
@@ -1230,7 +1231,7 @@ impl LL {
         decreases len,
     {
         if len == 0 {
-            (PointsToRaw::empty(), Map::tracked_empty())
+            (PointsToRaw::empty(provenance), Map::tracked_empty())
         } else {
             let j = (len - 1) as nat;
             assert(has_idx(m, j));
@@ -1243,7 +1244,7 @@ impl LL {
                 let p = choose |p: nat| old_m.dom().contains(p) && old_m[p].1@.key.idx == k;
                 assert(m.dom().contains(p) && m[p].1@.key.idx == k);
             }
-            let tracked (ptraw1, mut blocks) = Self::reconvene_rec(m, (len - 1) as nat, instance, page_id, block_size);
+            let tracked (ptraw1, mut blocks) = Self::reconvene_rec(m, (len - 1) as nat, instance, page_id, block_size, provenance);
 
             let tracked ptraw2 = ptraw1.join(ptraw);
             let old_blocks = blocks;
@@ -1451,14 +1452,14 @@ struct_with_invariants!{
         pub instance: Ghost<Mim::Instance>,
         pub heap_id: Ghost<HeapId>,
 
-        pub atomic: AtomicUsize<_, LL, _>,
+        pub atomic: AtomicPtr<Node, _, LL, _>,
     }
 
     pub closed spec fn wf(&self) -> bool {
         invariant
             on atomic
             with (instance, heap_id)
-            is (v: usize, ll: LL)
+            is (v: *mut Node, ll: LL)
         {
             // Valid linked list
 
@@ -1469,7 +1470,7 @@ struct_with_invariants!{
 
             // The usize value stores the pointer and the delay state
 
-            && v as int == ll.ptr().id()
+            && v == ll.ptr()
         }
     }
 }
@@ -1481,11 +1482,11 @@ impl ThreadLLSimple {
             s.instance@ == instance,
             s.heap_id@ == heap_id,
     {
-        let p: PPtr<Node> = PPtr::from_usize(0);
+        let p: *mut Node = core::ptr::null_mut();
         Self {
             instance: Ghost(instance),
             heap_id: Ghost(heap_id),
-            atomic: AtomicUsize::new(Ghost((Ghost(instance), Ghost(heap_id))), 0, Tracked(LL { first: p, data: Ghost(LLData { fixed_page: false, block_size: arbitrary(), page_id: arbitrary(), instance, len: 0, heap_id: Some(heap_id), }), perms: Tracked(Map::tracked_empty()), }),),
+            atomic: AtomicPtr::new(Ghost((Ghost(instance), Ghost(heap_id))), core::ptr::null_mut(), Tracked(LL { first: p, data: Ghost(LLData { fixed_page: false, block_size: arbitrary(), page_id: arbitrary(), instance, len: 0, heap_id: Some(heap_id), }), perms: Tracked(Map::tracked_empty()), }),),
         }
     }
 
@@ -1494,15 +1495,15 @@ impl ThreadLLSimple {
     //  (ii) is we don't expose the length
 
     #[inline(always)]
-    pub fn atomic_insert_block(&self, ptr: PPtr<Node>,
+    pub fn atomic_insert_block(&self, ptr: *mut Node,
         Tracked(points_to_raw): Tracked<PointsToRaw>,
         Tracked(block_token): Tracked<Mim::block>,
     )
         requires self.wf(),
-            points_to_raw.is_range(ptr.id(), block_token@.key.block_size as int),
+            points_to_raw.is_range(ptr as int, block_token@.key.block_size as int),
             block_token@.instance == self.instance,
             block_token@.value.heap_id == Some(self.heap_id@),
-            is_block_ptr(ptr.id(), block_token@.key),
+            is_block_ptr(ptr as int, block_token@.key),
     {
         let tracked mut points_to_raw = points_to_raw;
         let tracked mut block_token_opt = Some(block_token);
@@ -1512,15 +1513,14 @@ impl ThreadLLSimple {
                 block_token_opt == Some(block_token),
 
                 self.wf(),
-                points_to_raw.is_range(ptr.id(), block_token@.key.block_size as int),
+                points_to_raw.is_range(ptr as int, block_token@.key.block_size as int),
 
                 block_token@.instance == self.instance,
                 block_token@.value.heap_id == Some(self.heap_id@),
-                is_block_ptr(ptr.id(), block_token@.key),
+                is_block_ptr(ptr as int, block_token@.key),
         {
-            let next_int = atomic_with_ghost!(
+            let next_ptr = atomic_with_ghost!(
                 &self.atomic => load(); ghost g => { });
-            let next_ptr = PPtr::<Node>::from_usize(next_int);
 
             proof {
                 block_size_ge_word();
@@ -1529,9 +1529,8 @@ impl ThreadLLSimple {
 
             let (Tracked(ptr_mem0), Tracked(raw_mem0)) = LL::block_write_ptr(ptr, Tracked(points_to_raw), next_ptr);
 
-            let p = ptr.to_usize();
             let cas_result = atomic_with_ghost!(
-                &self.atomic => compare_exchange_weak(next_int, p);
+                &self.atomic => compare_exchange_weak(next_ptr, ptr);
                 returning cas_result;
                 ghost ghost_ll =>
             {
@@ -1545,7 +1544,7 @@ impl ThreadLLSimple {
                     ghost_ll.ghost_insert_block(ptr, ptr_mem, raw_mem, block_token);
                     block_token_opt = None;
 
-                    points_to_raw = PointsToRaw::empty();
+                    points_to_raw = PointsToRaw::empty(ptr@.provenance);
                 } else {
                     ptr_mem.leak_contents();
                     points_to_raw = ptr_mem.into_raw().join(raw_mem);
@@ -1568,15 +1567,15 @@ impl ThreadLLSimple {
             ll.heap_id() == Some(self.heap_id@),
     {
         let res = self.atomic.load();
-        if res == 0 {
+        if res.addr() == 0 {
             return LL::new(Ghost(arbitrary()), Ghost(arbitrary()),
                 Ghost(self.instance@), Ghost(arbitrary()), Ghost(Some(self.heap_id@)));
         }
 
         let tracked ll: LL;
-        let p = PPtr::<Node>::from_usize(0);
+        let p = core::ptr::null_mut();
         let res = atomic_with_ghost!(
-            &self.atomic => swap(0);
+            &self.atomic => swap(core::ptr::null_mut());
             ghost g => {
                 ll = g;
                 let mut data = ll.data@;
@@ -1590,7 +1589,7 @@ impl ThreadLLSimple {
             }
         );
         let new_ll = LL {
-            first: PPtr::from_usize(res),
+            first: res,
             data: Ghost(ll.data@),
             perms: Tracked(ll.perms.get()),
         };
@@ -1654,7 +1653,7 @@ struct_with_invariants!{
         // The pointer value is stored in the usize of the atomic.
         // We also use the lower 2 bits of the usize to store the delay state.
 
-        pub atomic: AtomicUsize<_, (StuffAgree::y, Option<(Mim::delay, LL)>), _>,
+        pub atomic: AtomicPtr<Node, _, (StuffAgree::y, Option<(Mim::delay, LL)>), _>,
 
         pub emp: Tracked<StuffAgree::x>,
         pub emp_inst: Tracked<StuffAgree::Instance>,
@@ -1667,13 +1666,13 @@ struct_with_invariants!{
         invariant
             on atomic
             with (instance, emp_inst)
-            is (v: usize, all_g: (StuffAgree::y, Option<(Mim::delay, LL)>))
+            is (v: *mut Node, all_g: (StuffAgree::y, Option<(Mim::delay, LL)>))
         {
             let (is_emp, g_opt) = all_g;
             is_emp@.instance == emp_inst@
             && (match (g_opt, is_emp@.value) {
                 (None, None) => {
-                    v == 0
+                    v as int == 0
                 }
                 (Some(g), Some(stuff)) => {
                     let (delay_token, ll) = g;
@@ -1696,10 +1695,10 @@ struct_with_invariants!{
 
                     // The usize value stores the pointer and the delay state
 
-                    && v as int == ll.ptr().id() + delay_token@.value.to_int()
+                    && v as int == ll.ptr() as int + delay_token@.value.to_int()
                     // Verus should be smart enough to figure out the
                     // encoding is injective from this:
-                    && ll.ptr().id() % 4 == 0
+                    && ll.ptr() as int % 4 == 0
                 }
                 _ => false,
             })
@@ -1730,9 +1729,7 @@ impl ThreadLLWithDelayBits {
         let emp_inst = Tracked(emp_inst);
         ThreadLLWithDelayBits {
             instance: Tracked(instance),
-            atomic: AtomicUsize::new(Ghost(
-                (Tracked(instance), emp_inst)
-            ), 0, Tracked((emp_y, None))),
+            atomic: AtomicPtr::new(Ghost((Tracked(instance), emp_inst)), core::ptr::null_mut(), Tracked((emp_y, None))),
             emp,
             emp_inst,
         }
@@ -1758,7 +1755,7 @@ impl ThreadLLWithDelayBits {
             self.page_id() == page_id,
             self.instance == instance,
     {
-        let p = PPtr::<Node>::from_usize(0);
+        let p = core::ptr::null_mut();
         let ghost data = LLData {
             fixed_page: true, block_size, page_id, instance, len: 0, heap_id: None,
         };
@@ -1803,7 +1800,7 @@ impl ThreadLLWithDelayBits {
 
                     // The usize value stores the pointer and the delay state
 
-                    assert(v as int == ll.ptr().id() + delay_token@.value.to_int());
+                    assert(v as int == ll.ptr() as int + delay_token@.value.to_int());
                     assert(ll.ptr().id() % 4 == 0);*/
 
             }
@@ -1996,7 +1993,7 @@ impl ThreadLLWithDelayBits {
             ll.fixed_page(),
     {
         let tracked ll: LL;
-        let p = PPtr::<Node>::from_usize(0);
+        let p = core::ptr::null_mut();
         let res = atomic_with_ghost!(
             &self.atomic => fetch_and(3);
             update old_v -> new_v;
@@ -2015,7 +2012,7 @@ impl ThreadLLWithDelayBits {
                 };
                 g = (emp_token, Some((delay, new_ll)));
 
-                let x = ll.first.id() as usize;
+                let x = ll.first as usize;
                 let y = delay@.value.to_int() as usize;
                 assert(add(x, y) & 3usize == y) by(bit_vector)
                     requires x % 4 == 0usize, 0usize <= y < 4usize;
@@ -2024,7 +2021,7 @@ impl ThreadLLWithDelayBits {
             }
         );
         let ret_ll = LL {
-            first: PPtr::from_usize(res & !3),
+            first: res.with_addr(res.addr() & !3),
             data: Ghost(ll.data@),
             perms: Tracked(ll.perms.get()),
         };
@@ -2039,85 +2036,89 @@ impl ThreadLLWithDelayBits {
 }
 
 #[inline(always)]
-pub fn masked_ptr_delay_get_is_use_delayed(v: usize,
+pub fn masked_ptr_delay_get_is_use_delayed(v: *mut Node,
     Ghost(expected_delay): Ghost<DelayState>,
-    Ghost(expected_ptr): Ghost<PPtr<Node>>) -> (b: bool)
-  requires v as int == expected_ptr.id() + expected_delay.to_int(),
-      expected_ptr.id() % 4 == 0,
+    Ghost(expected_ptr): Ghost<*mut Node>) -> (b: bool)
+  requires v as int == expected_ptr as int + expected_delay.to_int(),
+      expected_ptr as int % 4 == 0,
   ensures b <==> (expected_delay == DelayState::UseDelayedFree)
 {
-    v % 4 == 0
+    v.addr() % 4 == 0
 }
 
 #[inline(always)]
-pub fn masked_ptr_delay_get_delay(v: usize,
+pub fn masked_ptr_delay_get_delay(v: *mut Node,
     Ghost(expected_delay): Ghost<DelayState>,
-    Ghost(expected_ptr): Ghost<PPtr<Node>>) -> (d: usize)
-  requires v as int == expected_ptr.id() + expected_delay.to_int(),
-      expected_ptr.id() % 4 == 0,
+    Ghost(expected_ptr): Ghost<*mut Node>) -> (d: usize)
+  requires v as int == expected_ptr as int + expected_delay.to_int(),
+      expected_ptr as int % 4 == 0,
   ensures d == expected_delay.to_int()
 {
-    v % 4
+    v.addr() % 4
 }
 
 #[inline(always)]
-pub fn masked_ptr_delay_get_ptr(v: usize,
+pub fn masked_ptr_delay_get_ptr(v: *mut Node,
     Ghost(expected_delay): Ghost<DelayState>,
-    Ghost(expected_ptr): Ghost<PPtr<Node>>) -> (ptr: PPtr<Node>)
-  requires v as int == expected_ptr.id() + expected_delay.to_int(),
-      expected_ptr.id() % 4 == 0,
-  ensures ptr.id() == expected_ptr.id()
+    Ghost(expected_ptr): Ghost<*mut Node>) -> (ptr: *mut Node)
+  requires v as int == expected_ptr as int + expected_delay.to_int(),
+      expected_ptr as int % 4 == 0,
+  ensures ptr == expected_ptr
 {
     proof {
+        let v = v.addr();
         assert((v & !3) == sub(v, (v % 4))) by(bit_vector);
     }
-    PPtr::from_usize(v & !3)
+    v.with_addr(v.addr() & !3)
 }
 
 #[inline(always)]
-pub fn masked_ptr_delay_set_ptr(v: usize, new_ptr: PPtr<Node>,
+pub fn masked_ptr_delay_set_ptr(v: *mut Node, new_ptr: *mut Node,
     Ghost(expected_delay): Ghost<DelayState>,
-    Ghost(expected_ptr): Ghost<PPtr<Node>>) -> (v2: usize)
-  requires v as int == expected_ptr.id() + expected_delay.to_int(),
-      expected_ptr.id() % 4 == 0,
-      new_ptr.id() % 4 == 0,
-  ensures v2 as int == new_ptr.id() + expected_delay.to_int()
+    Ghost(expected_ptr): Ghost<*mut Node>) -> (v2: *mut Node)
+  requires v as int == expected_ptr as int + expected_delay.to_int(),
+      expected_ptr as int % 4 == 0,
+      new_ptr as int % 4 == 0,
+  ensures v2 as int == new_ptr as int + expected_delay.to_int()
 {
     proof {
+        let v = v as usize;
         assert((v & 3) == (v % 4)) by(bit_vector);
-        let u = new_ptr.id() as usize;
+        let u = new_ptr as usize;
         assert(u % 4 == 0usize ==> ((v&3) | u) == add(v&3, u)) by(bit_vector);
     }
-    (v & 3) | new_ptr.to_usize()
+    new_ptr.with_addr((v.addr() & 3) | new_ptr.addr())
 }
 
 #[inline(always)]
-pub fn masked_ptr_delay_set_freeing(v: usize,
+pub fn masked_ptr_delay_set_freeing(v: *mut Node,
     Ghost(expected_delay): Ghost<DelayState>,
-    Ghost(expected_ptr): Ghost<PPtr<Node>>) -> (v2: usize)
-  requires v as int == expected_ptr.id() + expected_delay.to_int(),
-      expected_ptr.id() % 4 == 0,
-  ensures v2 <==> expected_ptr.id() + DelayState::Freeing.to_int()
+    Ghost(expected_ptr): Ghost<*mut Node>) -> (v2: *mut Node)
+  requires v as int == expected_ptr as int + expected_delay.to_int(),
+      expected_ptr as int % 4 == 0,
+  ensures v2 as int == expected_ptr as int + DelayState::Freeing.to_int()
 {
     proof {
+        let v = v as usize;
         assert(((v & !3) | 1) == add(sub(v, (v % 4)), 1)) by(bit_vector);
     }
-    (v & !3) | 1
+    v.with_addr((v.addr() & !3) | 1)
 }
 
 #[inline(always)]
-pub fn masked_ptr_delay_set_delay(v: usize, new_delay: usize,
+pub fn masked_ptr_delay_set_delay(v: *mut Node, new_delay: usize,
     Ghost(expected_delay): Ghost<DelayState>,
-    Ghost(expected_ptr): Ghost<PPtr<Node>>) -> (v2: usize)
-  requires v as int == expected_ptr.id() + expected_delay.to_int(),
-      expected_ptr.id() % 4 == 0, new_delay <= 3,
-  ensures v2 <==> expected_ptr.id() + new_delay
+    Ghost(expected_ptr): Ghost<*mut Node>) -> (v2: *mut Node)
+  requires v as int == expected_ptr as int + expected_delay.to_int(),
+      expected_ptr as int % 4 == 0, new_delay <= 3,
+  ensures v2 as int == expected_ptr as int + new_delay
 {
     proof {
+        let v = v.addr();
         assert(((v & !3) | new_delay) == add(sub(v, (v % 4)), new_delay)) by(bit_vector)
             requires new_delay <= 3usize;
     }
-    (v & !3) | new_delay
+    v.with_addr((v.addr() & !3) | new_delay)
 }
 
 /*

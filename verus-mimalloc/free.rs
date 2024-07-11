@@ -139,7 +139,7 @@ pub fn free(ptr: *mut u8, Tracked(user_perm): Tracked<PointsToRaw>, Tracked(user
         Ghost(dealloc.block_id().page_id),
     );
 
-    assert(is_page_ptr(page_ptr as int, dealloc.block_id().page_id));
+    assert(is_page_ptr(page_ptr, dealloc.block_id().page_id));
 
     /*
     let tracked page_shared_access: &PageSharedAccess;
@@ -155,7 +155,7 @@ pub fn free(ptr: *mut u8, Tracked(user_perm): Tracked<PointsToRaw>, Tracked(user
         page_ptr,
         page_id: Ghost(page_id),
     };
-    assert(page_ptr.addr() != 0) by { is_page_ptr_nonzero(page_ptr as int, page_id); }
+    assert(page_ptr.addr() != 0) by { is_page_ptr_nonzero(page_ptr, page_id); }
 
     // Case based on whether this is thread local or not
 
@@ -308,7 +308,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
             mim_instance == local.instance,
             perm.is_range(ptr as int, dealloc.block_id().block_size as int),
             ptr as *mut u8 == dealloc.ptr,
-            is_page_ptr(page.page_ptr as int, dealloc.block_id().page_id),
+            is_page_ptr(page.page_ptr, dealloc.block_id().page_id),
             local.wf(),
             common_preserves(*old(local), *local),
 
@@ -551,9 +551,9 @@ pub fn free_delayed_block(ptr: *mut u8,
         Ghost(block_id.page_id_for_slice()),
         Ghost(block_id.page_id),
     );
-    assert(crate::layout::is_page_ptr(page_ptr as int, block_id.page_id));
+    assert(crate::layout::is_page_ptr(page_ptr, block_id.page_id));
     let ghost page_id = dealloc.block_id().page_id;
-    assert(page_ptr as int != 0) by { is_page_ptr_nonzero(page_ptr as int, page_id); }
+    assert(page_ptr as int != 0) by { is_page_ptr_nonzero(page_ptr, page_id); }
 
     let page = PagePtr { page_ptr: page_ptr, page_id: Ghost(block_id.page_id) };
     proof {

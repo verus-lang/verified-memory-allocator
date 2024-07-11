@@ -15,15 +15,19 @@ use crate::config::*;
 
 verus!{
 
-pub open spec fn is_page_ptr(ptr: int, page_id: PageId) -> bool {
-    ptr == page_header_start(page_id)
+pub open spec fn is_page_ptr(ptr: *mut Page, page_id: PageId) -> bool {
+    ptr as int == page_header_start(page_id)
         && 0 <= page_id.idx <= SLICES_PER_SEGMENT
         && segment_start(page_id.segment_id) + SEGMENT_SIZE < usize::MAX
+        && ptr@.provenance == page_id.segment_id.provenance
+        && ptr@.metadata == Metadata::Thin
 }
 
-pub open spec fn is_segment_ptr(ptr: int, segment_id: SegmentId) -> bool {
-    ptr == segment_start(segment_id)
-      && ptr + SEGMENT_SIZE < usize::MAX
+pub open spec fn is_segment_ptr(ptr: *mut SegmentHeader, segment_id: SegmentId) -> bool {
+    ptr as int == segment_start(segment_id)
+      && ptr as int + SEGMENT_SIZE < usize::MAX
+      && ptr@.provenance == segment_id.provenance
+      && ptr@.metadata == Metadata::Thin
 }
 
 pub open spec fn is_heap_ptr(ptr: int, heap_id: HeapId) -> bool {
@@ -96,7 +100,7 @@ pub open spec fn is_block_ptr(ptr: int, block_id: BlockId) -> bool {
 
 pub open spec fn is_page_ptr_opt(pptr: *mut Page, opt_page_id: Option<PageId>) -> bool {
     match opt_page_id {
-        Some(page_id) => is_page_ptr(pptr.addr() as int, page_id) && pptr.addr() != 0,
+        Some(page_id) => is_page_ptr(pptr, page_id) && pptr.addr() != 0,
         None => pptr.addr() == 0,
     }
 }
@@ -195,7 +199,7 @@ pub proof fn block_start_at_diff(page_id: PageId, block_size: nat,
 
 pub fn calculate_segment_ptr_from_block(ptr: *mut u8, Ghost(block_id): Ghost<BlockId>) -> (res: *mut SegmentHeader)
     requires is_block_ptr(ptr as int, block_id),
-    ensures is_segment_ptr(res as int, block_id.page_id.segment_id),
+    ensures is_segment_ptr(res, block_id.page_id.segment_id),
 {
     let block_p = ptr.addr();
 
@@ -260,8 +264,8 @@ pub fn calculate_slice_idx_from_block(block_ptr: PPtr<u8>, segment_ptr: PPtr<Seg
 pub fn calculate_slice_page_ptr_from_block(block_ptr: *mut u8, segment_ptr: *mut SegmentHeader, Ghost(block_id): Ghost<BlockId>) -> (page_ptr: *mut Page)
     requires
         is_block_ptr(block_ptr as int, block_id),
-        is_segment_ptr(segment_ptr as int, block_id.page_id.segment_id),
-    ensures is_page_ptr(page_ptr as int, block_id.page_id_for_slice())
+        is_segment_ptr(segment_ptr, block_id.page_id.segment_id),
+    ensures is_page_ptr(page_ptr, block_id.page_id_for_slice())
 {
     let b = block_ptr.addr();
     let s = segment_ptr.addr();
@@ -285,11 +289,11 @@ pub fn calculate_slice_page_ptr_from_block(block_ptr: *mut u8, segment_ptr: *mut
 pub fn calculate_page_ptr_subtract_offset(
     page_ptr: *mut Page, offset: u32, Ghost(page_id): Ghost<PageId>, Ghost(target_page_id): Ghost<PageId>) -> (result: *mut Page)
     requires
-        is_page_ptr(page_ptr as int, page_id),
+        is_page_ptr(page_ptr, page_id),
         page_id.segment_id == target_page_id.segment_id,
         offset == (page_id.idx - target_page_id.idx) * SIZEOF_PAGE_HEADER,
     ensures
-        is_page_ptr(result as int, target_page_id),
+        is_page_ptr(result, target_page_id),
 {
     proof {
         segment_start_ge0(page_id.segment_id);
@@ -356,14 +360,14 @@ pub fn calculate_page_block_at(
     return p;
 }
 
-pub proof fn mk_segment_id(p: int) -> (id: SegmentId)
-    requires p >= 0,
-        p % SEGMENT_SIZE as int == 0,
-        ((p + SEGMENT_SIZE as int) < usize::MAX),
+pub proof fn mk_segment_id(p: *mut SegmentHeader) -> (id: SegmentId)
+    requires p as int >= 0,
+        p as int % SEGMENT_SIZE as int == 0,
+        ((p as int + SEGMENT_SIZE as int) < usize::MAX),
     ensures is_segment_ptr(p, id),
 {
     const_facts();
-    SegmentId { id: p as nat / SEGMENT_SIZE as nat, uniq: 0 }
+    SegmentId { id: p as nat / SEGMENT_SIZE as nat, provenance: p@.provenance, uniq: 0 }
 }
 
 pub proof fn segment_id_divis(sp: SegmentPtr)
@@ -594,9 +598,9 @@ impl SegmentPtr {
     }
 }
 
-pub proof fn is_page_ptr_nonzero(ptr: int, page_id: PageId)
+pub proof fn is_page_ptr_nonzero(ptr: *mut Page, page_id: PageId)
     requires is_page_ptr(ptr, page_id),
-    ensures ptr != 0,
+    ensures ptr as int != 0,
 {
     segment_start_ge0(page_id.segment_id);
 }

@@ -807,7 +807,7 @@ fn segment_span_allocate(
                   local.unused_pages.dom().contains(page_id)
                   && (local.unused_pages.dom().contains(page_id) ==>
                     local.unused_pages[page_id].points_to.is_init()
-                    && is_page_ptr(local.unused_pages[page_id].points_to.ptr() as int, page_id)),
+                    && is_page_ptr(local.unused_pages[page_id].points_to.ptr(), page_id)),
           forall |page_id|
               #[trigger] local.unused_pages.dom().contains(page_id) ==>
               (
@@ -1108,7 +1108,7 @@ fn segment_alloc(
                     &&& pla_map[page_id].prev@.value.unwrap() as int == 0
                     &&& pla_map[page_id].next@.value.unwrap() as int == 0
 
-                    &&& is_page_ptr(psa_map[page_id].points_to.ptr() as int, page_id)
+                    &&& is_page_ptr(psa_map[page_id].points_to.ptr(), page_id)
                     &&& psa_map[page_id].points_to.is_init()
                     &&& psa_map[page_id].points_to.value().count.id() == pla_map[page_id].count@.pcell
                     &&& psa_map[page_id].points_to.value().inner.id() == pla_map[page_id].inner@.pcell
@@ -1422,7 +1422,7 @@ fn segment_os_alloc(
             segment_size, alignment, align_offset, request_commit, mem_large, req_arena_id);
         segment = SegmentPtr {
             segment_ptr: _segment as *mut SegmentHeader,
-            segment_id: Ghost(mk_segment_id(_segment as int)),
+            segment_id: Ghost(mk_segment_id(_segment as *mut SegmentHeader)),
         };
         mem_id = _mem_id;
         mem_large = _large;
@@ -2188,7 +2188,7 @@ fn segment_span_free_coalesce_before(segment: SegmentPtr, slice: PagePtr, tld: T
             Ghost(page_id));
         let page = PagePtr { page_ptr, page_id: Ghost(page_id) };
         proof { 
-            is_page_ptr_nonzero(page_ptr as int, page_id);
+            is_page_ptr_nonzero(page_ptr, page_id);
             //assert(page.wf());
         }
         if page.get_inner_ref(Tracked(&*local)).xblock_size == 0 {

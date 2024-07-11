@@ -103,7 +103,7 @@ pub fn heap_get_free_small_page(heap: HeapPtr, size: usize, Tracked(local): Trac
     requires 0 <= size <= SMALL_SIZE_MAX,
         local.wf_main(), heap.is_in(*local), heap.wf(),
     ensures
-        !page.is_empty_global(*local) ==> ({
+        page.is_empty_global(*local) || ({
           &&& page.wf()
           &&& Some(page.page_id@) == 
             local.page_organization.used_dlist_headers[smallest_bin_fitting_size((size + 7) / 8 * 8)].first

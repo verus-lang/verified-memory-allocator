@@ -271,19 +271,19 @@ pub open spec fn psa_differ_only_in_offset(psa1: PageSharedAccess, psa2: PageSha
 
 impl PageSharedAccess {
     pub open spec fn wf(&self, page_id: PageId, block_size: nat, mim_instance: Mim::Instance) -> bool {
-        &&& is_page_ptr(self.points_to.ptr() as int, page_id)
+        &&& is_page_ptr(self.points_to.ptr(), page_id)
         &&& self.points_to.is_init()
         &&& self.points_to.value().wf(page_id, block_size, mim_instance)
     }
 
     pub open spec fn wf_secondary(&self, page_id: PageId, block_size: nat, mim_instance: Mim::Instance) -> bool {
-        &&& is_page_ptr(self.points_to.ptr() as int, page_id)
+        &&& is_page_ptr(self.points_to.ptr(), page_id)
         &&& self.points_to.is_init()
         &&& self.points_to.value().wf_secondary(mim_instance)
     }
 
     pub open spec fn wf_unused(&self, page_id: PageId, mim_instance: Mim::Instance) -> bool {
-        &&& is_page_ptr(self.points_to.ptr() as int, page_id)
+        &&& is_page_ptr(self.points_to.ptr(), page_id)
         &&& self.points_to.is_init()
         &&& self.points_to.value().wf_unused(mim_instance)
     }
@@ -437,7 +437,7 @@ pub tracked struct SegmentSharedAccess {
 
 impl SegmentSharedAccess {
     pub open spec fn wf(&self, segment_id: SegmentId, mim_instance: Mim::Instance) -> bool {
-        &&& is_segment_ptr(self.points_to.ptr() as int, segment_id)
+        &&& is_segment_ptr(self.points_to.ptr(), segment_id)
         &&& (match self.points_to.opt_value() {
             MemContents::Init(segment_header) => segment_header.wf(mim_instance, segment_id),
             MemContents::Uninit => false,
@@ -1285,7 +1285,7 @@ impl Copy for SegmentPtr { }
 impl SegmentPtr {
     #[verifier(inline)]
     pub open spec fn wf(&self) -> bool {
-        is_segment_ptr(self.segment_ptr as int, self.segment_id@)
+        is_segment_ptr(self.segment_ptr, self.segment_id@)
     }
 
     #[verifier(inline)]
@@ -1493,7 +1493,7 @@ impl Copy for PagePtr { }
 impl PagePtr {
     #[verifier(inline)]
     pub open spec fn wf(&self) -> bool {
-        is_page_ptr(self.page_ptr as int, self.page_id@)
+        is_page_ptr(self.page_ptr, self.page_id@)
           && self.page_ptr.addr() != 0
     }
 
@@ -1704,11 +1704,12 @@ impl PagePtr {
                 segment_id: self.page_id@.segment_id,
                 idx: (self.page_id@.idx - count) as nat,
             };
+        let q = self.page_ptr.with_addr(q);
         proof {
-            crate::layout::is_page_ptr_nonzero(q as int, page_id);
+            crate::layout::is_page_ptr_nonzero(q, page_id);
         }
         PagePtr {
-            page_ptr: self.page_ptr.with_addr(q),
+            page_ptr: q,
             page_id: Ghost(page_id)
         }
     }

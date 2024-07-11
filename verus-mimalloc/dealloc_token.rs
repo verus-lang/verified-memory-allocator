@@ -34,7 +34,7 @@ pub open spec fn valid_block_token(block: Mim::block, instance: Mim::Instance) -
     // Valid segment
 
     &&& is_segment_ptr(
-        block@.value.segment_shared_access.points_to.ptr() as int,
+        block@.value.segment_shared_access.points_to.ptr(),
         block@.key.page_id.segment_id)
     &&& block@.value.segment_shared_access.points_to.is_init()
     &&& block@.value.segment_shared_access.points_to.value()
@@ -43,7 +43,7 @@ pub open spec fn valid_block_token(block: Mim::block, instance: Mim::Instance) -
     // Valid slice page
 
     &&& is_page_ptr(
-        block@.value.page_slice_shared_access.points_to.ptr() as int,
+        block@.value.page_slice_shared_access.points_to.ptr(),
         block@.key.page_id_for_slice())
     &&& block@.value.page_slice_shared_access.points_to.is_init()
     &&& block@.value.page_slice_shared_access.points_to.value().offset as int

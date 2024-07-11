@@ -27,6 +27,7 @@ pub ghost struct TldId {
 
 pub ghost struct SegmentId {
     pub id: nat,
+    pub provenance: Provenance,
     pub uniq: int,
 }
 
@@ -675,7 +676,7 @@ tokenized_state_machine!{ Mim {
 
     pub closed spec fn mk_fresh_segment_id(tos: Map<SegmentId, ThreadId>, sid: SegmentId) -> SegmentId {
         let uniq = segment_get_unused_uniq_field(tos.dom());
-        SegmentId { id: sid.id, uniq: uniq }
+        SegmentId { id: sid.id, provenance: sid.provenance, uniq: uniq }
     }
 
     transition!{

@@ -347,8 +347,8 @@ pub proof fn preserves_mem_chunk_good(local1: Local, local2: Local)
     ensures forall |sid| #[trigger] local1.segments.dom().contains(sid) ==>
         local1.mem_chunk_good(sid) ==> local2.mem_chunk_good(sid),
 {
-    let sid1 = SegmentId { id: 0, uniq: 0 };
-    let sid2 = SegmentId { id: 1, uniq: 0 };
+    let sid1 = SegmentId { id: 0, uniq: 0, provenance: Provenance::null() };
+    let sid2 = SegmentId { id: 1, uniq: 0, provenance: Provenance::null() };
     preserves_mem_chunk_good_except(local1, local2, sid1);
     preserves_mem_chunk_good_except(local1, local2, sid2);
 }

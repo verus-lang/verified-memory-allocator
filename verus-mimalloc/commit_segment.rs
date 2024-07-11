@@ -21,25 +21,25 @@ fn clock_now() -> i64 {
 
 // Should not be called for huge segments, I think? TODO can probably optimize out some checks
 fn segment_commit_mask(
-    segment_ptr: usize,
+    segment_ptr: *mut u8,
     conservative: bool,
     p: usize,
     size: usize,
     cm: &mut CommitMask)
- -> (res: (usize, usize)) // start_p, full_size
+ -> (res: (*mut u8, usize)) // start_p, full_size
     requires
         segment_ptr as int % SEGMENT_SIZE as int == 0,
-        segment_ptr + SEGMENT_SIZE <= usize::MAX,
-        p >= segment_ptr,
-        p + size <= segment_ptr + SEGMENT_SIZE,
+        segment_ptr as int + SEGMENT_SIZE <= usize::MAX,
+        p >= segment_ptr as int,
+        p + size <= segment_ptr as int + SEGMENT_SIZE,
         old(cm)@ == Set::<int>::empty(),
-    ensures ({ let (start_p, full_size) = res; {
+    ensures ({ let (start_p, full_size) = res; let start_p = start_p.addr(); {
         (cm@ == Set::<int>::empty() ==> !conservative ==> size == 0)
         && (cm@ != Set::<int>::empty() ==>
             (conservative ==> p <= start_p <= start_p + full_size <= p + size)
             && (!conservative ==> start_p <= p <= p + size <= start_p + full_size)
-            && start_p >= segment_ptr
-            && start_p + full_size <= segment_ptr + SEGMENT_SIZE
+            && start_p >= segment_ptr as int
+            && start_p + full_size <= segment_ptr as int + SEGMENT_SIZE
             //&& (!conservative ==> set_int_range((p - segment_ptr) / COMMIT_SIZE as int,
             //    (((p + size - 1 - segment_ptr as int) / COMMIT_SIZE as int) + 1)).subset_of(cm@))
             //&& (conservative ==> cm@ <= set_int_range((p - segment_ptr) / COMMIT_SIZE as int,
@@ -47,12 +47,12 @@ fn segment_commit_mask(
             && start_p as int % COMMIT_SIZE as int == 0
             && full_size as int % COMMIT_SIZE as int == 0
             && cm@ =~= 
-                set_int_range((start_p - segment_ptr) / COMMIT_SIZE as int,
-                    (((start_p + full_size - segment_ptr) / COMMIT_SIZE as int)))
+                set_int_range((start_p - segment_ptr as int) / COMMIT_SIZE as int,
+                    (((start_p + full_size - segment_ptr as int) / COMMIT_SIZE as int)))
         )
         && (!conservative ==> forall |i| #[trigger] cm@.contains(i) ==>
-            start_p <= segment_ptr + i * SLICE_SIZE
-            && start_p + full_size >= segment_ptr + (i + 1) * SLICE_SIZE
+            start_p <= segment_ptr as int + i * SLICE_SIZE
+            && start_p + full_size >= segment_ptr as int + (i + 1) * SLICE_SIZE
         )
         //&& start_p as int % SLICE_SIZE as int == 0
         //&& full_size as int % SLICE_SIZE as int == 0
@@ -61,17 +61,17 @@ fn segment_commit_mask(
     proof { const_facts(); }
 
     if size == 0 || size > SEGMENT_SIZE as usize {
-        return (0, 0);
+        return (core::ptr::null_mut(), 0);
     }
 
     let segstart: usize = SLICE_SIZE as usize;
     let segsize: usize = SEGMENT_SIZE as usize;
 
-    if p >= segment_ptr + segsize {
-        return (0, 0);
+    if p >= segment_ptr.addr() + segsize {
+        return (core::ptr::null_mut(), 0);
     }
 
-    let pstart: usize = p - segment_ptr;
+    let pstart: usize = p - segment_ptr.addr();
 
     let mut start: usize;
     let mut end: usize;
@@ -91,7 +91,7 @@ fn segment_commit_mask(
         end = segsize;
     }
 
-    let start_p = segment_ptr + start;
+    let start_p = segment_ptr.with_addr(segment_ptr.addr() + start);
     let full_size = if end > start { end - start } else { 0 };
     if full_size == 0 {
         return (start_p, full_size);
@@ -102,19 +102,20 @@ fn segment_commit_mask(
     cm.create(bitidx, bitcount);
 
     proof {
+        let start_p = start_p as int;
         if conservative {
             assert(p <= start_p);
             assert(start_p + full_size <= p + size);
         } else {
             assert(start_p <= p);
 
-            assert(start_p + full_size == segment_ptr + end);
-            assert(p + size == segment_ptr + pstart + size);
+            assert(start_p + full_size == segment_ptr as int + end);
+            assert(p + size == segment_ptr as int + pstart + size);
             assert(end >= pstart + size);
 
             assert(p + size <= start_p + full_size);
 
-            assert((p - segment_ptr) / COMMIT_SIZE as int >= bitidx);
+            assert((p - segment_ptr as int) / COMMIT_SIZE as int >= bitidx);
             assert((((p + size - 1 - segment_ptr as int) / COMMIT_SIZE as int) + 1) <= bitidx + bitcount);
         }
         if full_size > 0 {
@@ -169,7 +170,7 @@ fn segment_commitx(
 
     let mut mask: CommitMask = CommitMask::empty();
     let (start, full_size) = segment_commit_mask(
-        segment.segment_ptr.addr(), !commit, p, size, &mut mask);
+        segment.segment_ptr as *mut u8, !commit, p, size, &mut mask);
 
     if mask.is_empty() || full_size == 0 {
         return true;
@@ -179,8 +180,8 @@ fn segment_commitx(
         proof {
             let ghost sid = segment.segment_id@;
             assert(local.mem_chunk_good(sid));
-            assert(segment_start(sid) <= start);
-            assert(start + full_size <= segment_start(sid) + SEGMENT_SIZE);
+            assert(segment_start(sid) <= start as int);
+            assert(start as int + full_size <= segment_start(sid) + SEGMENT_SIZE);
             //assert(local.segments[sid].mem.os_exact_range(
             //    segment_start(sid), SEGMENT_SIZE as int));
         }
@@ -366,7 +367,7 @@ pub fn segment_perhaps_decommit(
 
         let mut mask: CommitMask = CommitMask::empty();
         let (start, full_size) =
-            segment_commit_mask(segment.segment_ptr.addr(), true, p, size, &mut mask);
+            segment_commit_mask(segment.segment_ptr as *mut u8, true, p, size, &mut mask);
 
         if mask.is_empty() || full_size == 0 {
             return;

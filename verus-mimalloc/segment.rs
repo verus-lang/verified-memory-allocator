@@ -1452,7 +1452,7 @@ fn segment_os_alloc(
         //assert(commit_needed as int * COMMIT_SIZE as int <= segment_size);
 
         let (success, is_zero) = crate::os_commit::os_commit(
-            segment.segment_ptr.addr(),
+            segment.segment_ptr as *mut u8,
             commit_needed * COMMIT_SIZE as usize,
             Tracked(&mut mem));
         if !success {

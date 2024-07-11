@@ -11,14 +11,14 @@ use vstd::set_lib::set_int_range;
 
 verus!{
 
-pub fn os_commit(addr: usize, size: usize, Tracked(mem): Tracked<&mut MemChunk>)
+pub fn os_commit(addr: *mut u8, size: usize, Tracked(mem): Tracked<&mut MemChunk>)
     -> (res: (bool, bool))
     requires old(mem).wf(), 
         old(mem).os_has_range(addr as int, size as int),
         addr as int % page_size() == 0,
         size as int % page_size() == 0,
-        addr != 0,
-        addr + size <= usize::MAX,
+        addr as int != 0,
+        addr as int + size <= usize::MAX,
         //old(mem).has_pointsto_for_all_read_write(),
     ensures ({
         let (success, is_zero) = res;
@@ -35,15 +35,15 @@ pub fn os_commit(addr: usize, size: usize, Tracked(mem): Tracked<&mut MemChunk>)
     os_commitx(addr, size, true, false, Tracked(&mut *mem))
 }
 
-pub fn os_decommit(addr: usize, size: usize, Tracked(mem): Tracked<&mut MemChunk>)
+pub fn os_decommit(addr: *mut u8, size: usize, Tracked(mem): Tracked<&mut MemChunk>)
     -> (success: bool)
     requires old(mem).wf(), 
         old(mem).os_has_range(addr as int, size as int),
         old(mem).pointsto_has_range(addr as int, size as int),
         addr as int % page_size() == 0,
         size as int % page_size() == 0,
-        addr != 0,
-        addr + size <= usize::MAX,
+        addr as int != 0,
+        addr as int + size <= usize::MAX,
     ensures
         mem.wf(),
         mem.os.dom() =~= old(mem).os.dom(),
@@ -54,7 +54,7 @@ pub fn os_decommit(addr: usize, size: usize, Tracked(mem): Tracked<&mut MemChunk
         old(mem).points_to.dom() - mem.points_to.dom()
             =~= old(mem).os_rw_bytes() - mem.os_rw_bytes(),
         old(mem).os_rw_bytes() - mem.os_rw_bytes()
-            <= set_int_range(addr as int, addr + size),
+            <= set_int_range(addr as int, addr as int + size),
 {
     let tracked mut t = mem.split(addr as int, size as int);
     let ghost t1 = t;
@@ -66,7 +66,7 @@ pub fn os_decommit(addr: usize, size: usize, Tracked(mem): Tracked<&mut MemChunk
         assert forall |p| mem.os_rw_bytes().contains(p)
             implies old(mem).os_rw_bytes().contains(p)
         by {
-            if addr <= p < addr + size {
+            if addr as int <= p < addr as int + size {
                 assert(t1.os_rw_bytes().contains(p));
                 assert(t.os_rw_bytes().contains(p));
                 assert(old(mem).os_rw_bytes().contains(p));
@@ -79,7 +79,7 @@ pub fn os_decommit(addr: usize, size: usize, Tracked(mem): Tracked<&mut MemChunk
             p =>
         {
             if (old(mem).points_to.dom() - mem.points_to.dom()).contains(p) {
-                if addr <= p < addr + size {
+                if addr as int <= p < addr as int + size {
                     assert((t1.points_to.dom() - t.points_to.dom()).contains(p));
                     assert((t1.os_rw_bytes() - t.os_rw_bytes()).contains(p));
                     assert((old(mem).os_rw_bytes() - mem.os_rw_bytes()).contains(p));
@@ -88,7 +88,7 @@ pub fn os_decommit(addr: usize, size: usize, Tracked(mem): Tracked<&mut MemChunk
                 }
             }
             if (old(mem).os_rw_bytes() - mem.os_rw_bytes()).contains(p) {
-                if addr <= p < addr + size {
+                if addr as int <= p < addr as int + size {
                     assert((t1.os_rw_bytes() - t.os_rw_bytes()).contains(p));
                     assert((t1.points_to.dom() - t.points_to.dom()).contains(p));
                     assert((old(mem).points_to.dom() - mem.points_to.dom()).contains(p));
@@ -141,15 +141,15 @@ fn os_page_align_areax(conservative: bool, addr: usize, size: usize)
 }
 
 fn os_commitx(
-    addr: usize, size: usize, commit: bool, conservative: bool,
+    addr: *mut u8, size: usize, commit: bool, conservative: bool,
     Tracked(mem): Tracked<&mut MemChunk>
 ) -> (res: (bool, bool))
     requires old(mem).wf(), 
         old(mem).os_has_range(addr as int, size as int),
         addr as int % page_size() as int == 0,
         size as int % page_size() as int == 0,
-        addr != 0,
-        addr + size <= usize::MAX,
+        addr as int != 0,
+        addr as int + size <= usize::MAX,
         !commit ==> old(mem).pointsto_has_range(addr as int, size as int),
     ensures
         mem.wf(),
@@ -162,13 +162,13 @@ fn os_commitx(
                     =~= old(mem).os_rw_bytes() - mem.os_rw_bytes(),
 {
     let is_zero = false;
-    let (start, csize) = os_page_align_areax(conservative, addr, size);
+    let (start, csize) = os_page_align_areax(conservative, addr.addr(), size);
     if csize == 0 {
         return (true, is_zero);
     }
     let err = 0;
 
-    let p = start as *mut u8;
+    let p = addr.with_addr(start);
 
     let tracked weird_extra = mem.take_points_to_set(
           mem.points_to.dom() - mem.os_rw_bytes());

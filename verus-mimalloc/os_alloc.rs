@@ -105,7 +105,7 @@ pub fn os_alloc_aligned(
         size as int % page_size() == 0,
         alignment as int % page_size() == 0,
     ensures ({ let (addr, is_large, mem) = res;
-        addr != 0 ==> (
+        addr as int != 0 ==> (
             mem@.wf()
             && mem@.os_has_range(addr as int, size as int)
             && addr as int + size <= usize::MAX
@@ -140,7 +140,7 @@ pub fn os_mem_alloc_aligned(
         size <= SEGMENT_SIZE,
         alignment as int % page_size() == 0,
     ensures ({ let (addr, is_large, mem) = res;
-        addr != 0 ==> (
+        addr as int != 0 ==> (
             mem@.wf()
             && mem@.os_exact_range(addr as int, size as int)
             && addr as int + size <= usize::MAX
@@ -205,7 +205,7 @@ fn os_mem_alloc(
     let mut try_alignment = try_alignment;
     if try_alignment == 0 { try_alignment = 1; }
 
-    unix_mmap(0, size, try_alignment, request_commit, false, allow_large)
+    unix_mmap(core::ptr::null_mut(), size, try_alignment, request_commit, false, allow_large)
 }
 
 fn use_large_os_page(size: usize, alignment: usize) -> bool {
@@ -213,7 +213,7 @@ fn use_large_os_page(size: usize, alignment: usize) -> bool {
 }
 
 fn unix_mmap(
-    addr: usize,
+    addr: *mut u8,
     size: usize,
     try_alignment: usize,
     prot_rw: bool,
@@ -304,7 +304,7 @@ fn os_get_aligned_hint(try_alignment: usize, size: usize) -> (hint: usize)
 }
 
 fn unix_mmapx(
-    hint: usize,
+    hint: *mut u8,
     size: usize,
     try_alignment: usize,
     prot_rw: bool,
@@ -325,19 +325,20 @@ fn unix_mmapx(
         )
     })
 {
-    if hint == 0 && INTPTR_SIZE >= 8 {
-        let hint = os_get_aligned_hint(try_alignment, size);
+    if hint.addr()  == 0 && INTPTR_SIZE >= 8 {
+        let hinti = os_get_aligned_hint(try_alignment, size);
+        let hint = hint.with_addr(hinti);
         proof {
             const_facts();
             if try_alignment > 1 {
                 mod_trans(hint as int, try_alignment as int, page_size());
             }
         }
-        if hint != 0 {
+        if hint.addr() != 0 {
             let (p, Tracked(mem)) = if prot_rw {
-                mmap_prot_read_write(hint as *mut u8, size)
+                mmap_prot_read_write(hint, size)
             } else {
-                mmap_prot_none(hint as *mut u8, size)
+                mmap_prot_none(hint, size)
             };
             if p.addr() != MAP_FAILED {
                 return (p, Tracked(mem));
@@ -345,9 +346,9 @@ fn unix_mmapx(
         }
     }
     let (p, Tracked(mem)) = if prot_rw {
-        mmap_prot_read_write(hint as *mut u8, size)
+        mmap_prot_read_write(hint, size)
     } else {
-        mmap_prot_none(hint as *mut u8, size)
+        mmap_prot_none(hint, size)
     };
     if p.addr() != MAP_FAILED {
         return (p, Tracked(mem));

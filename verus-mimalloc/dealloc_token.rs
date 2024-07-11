@@ -65,7 +65,7 @@ impl MimDeallocInner {
 
     pub open spec fn wf(&self) -> bool {
         &&& valid_block_token(self.mim_block, self.mim_instance)
-        &&& is_block_ptr(self.ptr as int, self.block_id())
+        &&& is_block_ptr(self.ptr, self.block_id())
     }
 
     pub proof fn into_user(tracked self, tracked points_to_raw: PointsToRaw, sz: int)

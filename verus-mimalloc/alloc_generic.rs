@@ -326,7 +326,7 @@ fn page_free_list_extend(
             //    requires bsize % 8 == 0;
         }
         assert forall |i: int| cap_nat <= i < cap_nat + extend_nat
-            implies is_block_ptr(
+            implies is_block_ptr1(
                 block_start(block_tokens.index(i)@.key),
                 block_tokens.index(i)@.key,
             )

@@ -10,7 +10,7 @@ use vstd::layout::*;
 use vstd::atomic_ghost::*;
 
 use crate::tokens::{Mim, BlockId, PageId, DelayState, HeapId};
-use crate::layout::{is_block_ptr, block_size_ge_word, block_ptr_aligned_to_word, block_start_at, block_start};
+use crate::layout::{is_block_ptr, block_size_ge_word, block_ptr_aligned_to_word, block_start_at, block_start, is_block_ptr1};
 use crate::types::*;
 use crate::config::INTPTR_SIZE;
 use core::intrinsics::unlikely;
@@ -107,7 +107,7 @@ impl LL {
 
                   // block_token is correct
                   && block_token@.instance == self.data@.instance
-                  && is_block_ptr(perm.ptr() as int, block_token@.key)
+                  && is_block_ptr(perm.ptr() as *mut u8, block_token@.key)
 
                   && (self.data@.fixed_page ==> (
                       block_token@.key.page_id == self.data@.page_id
@@ -168,7 +168,7 @@ impl LL {
             points_to_raw.is_range(ptr as int, block_token@.key.block_size as int),
             //old(self).is_valid_page_address(points_to_raw.ptr()),
             block_token@.instance == old(self).instance(),
-            is_block_ptr(ptr as int, block_token@.key),
+            is_block_ptr(ptr, block_token@.key),
             old(self).fixed_page() ==> (
                 block_token@.key.page_id == old(self).page_id()
                 && block_token@.key.block_size == old(self).block_size()
@@ -251,7 +251,7 @@ impl LL {
      )
         requires old(self).wf(),
             block_token@.instance == old(self).instance(),
-            is_block_ptr(ptr as int, block_token@.key),
+            is_block_ptr(ptr as *mut u8, block_token@.key),
 
             // Require that the pointer has already been written:
             points_to_ptr.ptr() == ptr,
@@ -362,9 +362,10 @@ impl LL {
                 &&& self.heap_id() == old(self).heap_id()
 
                 &&& points_to@.is_range(ptr as int, block_token@@.key.block_size as int)
+                &&& points_to@.provenance() == ptr@.provenance
 
                 &&& block_token@@.instance == old(self).instance()
-                &&& is_block_ptr(ptr as int, block_token@@.key)
+                &&& is_block_ptr(ptr, block_token@@.key)
 
                 &&& (self.fixed_page() ==> (
                     block_token@@.key.page_id == self.page_id()
@@ -701,7 +702,7 @@ impl LL {
             (forall |i: int| cap <= i < cap + extend ==> old(tokens).index(i)@.key.page_id == old(self).page_id()),
             (forall |i: int| cap <= i < cap + extend ==> old(tokens).index(i)@.key.idx == i),
             (forall |i: int| cap <= i < cap + extend ==> old(tokens).index(i)@.key.block_size == bsize),
-            (forall |i: int| cap <= i < cap + extend ==> is_block_ptr(
+            (forall |i: int| cap <= i < cap + extend ==> is_block_ptr1(
                 block_start(old(tokens).index(i)@.key),
                 old(tokens).index(i)@.key)
             )
@@ -914,7 +915,7 @@ impl LL {
                     let next_ptr = self.next_ptr(j);
 
                     assert(block_token@.key.block_size == bsize);
-                    assert(is_block_ptr(perm.ptr() as int, block_token@.key)) by {
+                    assert(is_block_ptr(perm.ptr() as *mut u8, block_token@.key)) by {
                         let block_id = block_token@.key;
                         crate::layout::get_block_start_defn(block_id);
                         let k = old_len + extend - 1 - j;
@@ -1024,7 +1025,7 @@ impl LL {
                     && padding.is_range(perm.ptr() as int + size_of::<Node>(),
                         block_token@.key.block_size - size_of::<Node>())
                     && block_token@.instance == instance
-                    && is_block_ptr(perm.ptr() as int, block_token@.key)
+                    && is_block_ptr(perm.ptr() as *mut u8, block_token@.key)
                     && block_token@.key.page_id == page_id
                     && block_token@.key.block_size == block_size
               }))
@@ -1054,7 +1055,7 @@ impl LL {
             assert(m.dom().contains(i));
             let tracked (mut perm, padding, block_token) = m.tracked_remove(i);
             let tracked mut m2 = Self::convene_pt_map(m, i, instance, page_id, block_size);
-            crate::layout::get_block_start_from_is_block_ptr(perm.ptr() as int, block_token@.key);
+            crate::layout::get_block_start_from_is_block_ptr(perm.ptr() as *mut u8, block_token@.key);
             perm.leak_contents();
             let tracked mut permraw = perm.into_raw();
             let tracked ptraw = permraw.join(padding);
@@ -1503,7 +1504,7 @@ impl ThreadLLSimple {
             points_to_raw.is_range(ptr as int, block_token@.key.block_size as int),
             block_token@.instance == self.instance,
             block_token@.value.heap_id == Some(self.heap_id@),
-            is_block_ptr(ptr as int, block_token@.key),
+            is_block_ptr(ptr as *mut u8, block_token@.key),
     {
         let tracked mut points_to_raw = points_to_raw;
         let tracked mut block_token_opt = Some(block_token);
@@ -1517,7 +1518,7 @@ impl ThreadLLSimple {
 
                 block_token@.instance == self.instance,
                 block_token@.value.heap_id == Some(self.heap_id@),
-                is_block_ptr(ptr as int, block_token@.key),
+                is_block_ptr(ptr as *mut u8, block_token@.key),
         {
             let next_ptr = atomic_with_ghost!(
                 &self.atomic => load(); ghost g => { });

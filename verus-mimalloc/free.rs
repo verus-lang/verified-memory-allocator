@@ -347,7 +347,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
             proof {
                 block_size_ge_word();
                 block_ptr_aligned_to_word();
-                is_block_ptr_mult4(ptr as int, dealloc.block_id());
+                is_block_ptr_mult4(ptr as *mut u8, dealloc.block_id());
             }
 
             // *ptr = mask.next_ptr
@@ -401,7 +401,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
 
                     mim_block_opt = None;
 
-                    is_block_ptr_mult4(ptr as int, dealloc.block_id());
+                    is_block_ptr_mult4(ptr as *mut u8, dealloc.block_id());
                 } else {
                     // do nothing
 

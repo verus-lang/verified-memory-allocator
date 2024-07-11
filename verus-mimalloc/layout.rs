@@ -69,8 +69,14 @@ pub closed spec fn block_start(block_id: BlockId) -> int {
     block_start_at(block_id.page_id, block_id.block_size as int, block_id.idx as int)
 }
 
+pub open spec fn is_block_ptr(ptr: *mut u8, block_id: BlockId) -> bool {
+    &&& ptr@.provenance == block_id.page_id.segment_id.provenance
+    &&& ptr@.metadata == Metadata::Thin
+    &&& is_block_ptr1(ptr as int, block_id)
+}
+
 #[verifier::opaque]
-pub open spec fn is_block_ptr(ptr: int, block_id: BlockId) -> bool {
+pub open spec fn is_block_ptr1(ptr: int, block_id: BlockId) -> bool {
     // ptr should be in the range (segment start, segment end]
     // Yes, that's open at the start and closed at the end
     //  - segment start is invalid since that's where the SegmentHeader is
@@ -109,19 +115,19 @@ pub proof fn block_size_ge_word()
     ensures forall |p, block_id| is_block_ptr(p, block_id) ==>
         block_id.block_size >= size_of::<crate::linked_list::Node>()
 {
-    reveal(is_block_ptr);
+    reveal(is_block_ptr1);
 }
 
 #[verifier::spinoff_prover]
 pub proof fn block_ptr_aligned_to_word()
     ensures forall |p, block_id| is_block_ptr(p, block_id) ==>
-        p % align_of::<crate::linked_list::Node>() as int == 0
+        p as int % align_of::<crate::linked_list::Node>() as int == 0
 {
     assert forall |p, block_id| is_block_ptr(p, block_id) implies
-        p % align_of::<crate::linked_list::Node>() as int == 0
+        p as int % align_of::<crate::linked_list::Node>() as int == 0
     by {
         const_facts();
-        reveal(is_block_ptr);
+        reveal(is_block_ptr1);
         crate::linked_list::size_of_node();
         let page_id = block_id.page_id;
         assert(segment_start(page_id.segment_id) % 8 == 0);
@@ -134,7 +140,7 @@ pub proof fn block_ptr_aligned_to_word()
         mod_mul(block_idx, block_size as int, 8);
         assert((block_idx * block_size) % 8 == 0);
         assert(block_start(block_id) % 8 == 0);
-        assert(p % 8 == 0);
+        assert(p as int % 8 == 0);
     }
 }
 
@@ -198,13 +204,13 @@ pub proof fn block_start_at_diff(page_id: PageId, block_size: nat,
 // Executable calculations
 
 pub fn calculate_segment_ptr_from_block(ptr: *mut u8, Ghost(block_id): Ghost<BlockId>) -> (res: *mut SegmentHeader)
-    requires is_block_ptr(ptr as int, block_id),
+    requires is_block_ptr(ptr, block_id),
     ensures is_segment_ptr(res, block_id.page_id.segment_id),
 {
     let block_p = ptr.addr();
 
     proof {
-        reveal(is_block_ptr);
+        reveal(is_block_ptr1);
         const_facts();
         assert(block_p > 0);
 
@@ -263,14 +269,14 @@ pub fn calculate_slice_idx_from_block(block_ptr: PPtr<u8>, segment_ptr: PPtr<Seg
 
 pub fn calculate_slice_page_ptr_from_block(block_ptr: *mut u8, segment_ptr: *mut SegmentHeader, Ghost(block_id): Ghost<BlockId>) -> (page_ptr: *mut Page)
     requires
-        is_block_ptr(block_ptr as int, block_id),
+        is_block_ptr(block_ptr, block_id),
         is_segment_ptr(segment_ptr, block_id.page_id.segment_id),
     ensures is_page_ptr(page_ptr, block_id.page_id_for_slice())
 {
     let b = block_ptr.addr();
     let s = segment_ptr.addr();
     proof {
-        reveal(is_block_ptr);
+        reveal(is_block_ptr1);
         const_facts();
         assert(b - s <= SEGMENT_SIZE);
     }
@@ -605,9 +611,9 @@ pub proof fn is_page_ptr_nonzero(ptr: *mut Page, page_id: PageId)
     segment_start_ge0(page_id.segment_id);
 }
 
-pub proof fn is_block_ptr_mult4(ptr: int, block_id: BlockId)
+pub proof fn is_block_ptr_mult4(ptr: *mut u8, block_id: BlockId)
     requires is_block_ptr(ptr, block_id),
-    ensures ptr % 4 == 0,
+    ensures ptr as int % 4 == 0,
 {
     hide(is_block_ptr);
     crate::linked_list::size_of_node();
@@ -655,11 +661,11 @@ pub proof fn segment_start_eq(sid: SegmentId, sid2: SegmentId)
 {
 }
 
-pub proof fn get_block_start_from_is_block_ptr(ptr: int, block_id: BlockId)
+pub proof fn get_block_start_from_is_block_ptr(ptr: *mut u8, block_id: BlockId)
     requires is_block_ptr(ptr, block_id),
-    ensures ptr == block_start(block_id),
+    ensures ptr as int == block_start(block_id),
 {
-    reveal(is_block_ptr);
+    reveal(is_block_ptr1);
 }
 
 pub proof fn get_block_start_defn(block_id: BlockId)

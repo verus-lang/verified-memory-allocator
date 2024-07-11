@@ -3,7 +3,7 @@
 use core::intrinsics::{unlikely, likely};
 
 use vstd::prelude::*;
-use vstd::ptr::*;
+use vstd::raw_ptr::*;
 use vstd::*;
 use vstd::modes::*;
 use vstd::set_lib::*;
@@ -24,7 +24,7 @@ pub fn malloc_generic(
     zero: bool,
     huge_alignment: usize,
     Tracked(local): Tracked<&mut Local>,
-) -> (t: (PPtr<u8>, Tracked<PointsToRaw>, Tracked<MimDealloc>))
+) -> (t: (*mut u8, Tracked<PointsToRaw>, Tracked<MimDealloc>))
     requires
         old(local).wf(),
         heap.wf(),
@@ -35,8 +35,9 @@ pub fn malloc_generic(
             let (ptr, points_to_raw, dealloc) = t;
 
             dealloc@.wf()
-              && points_to_raw@.is_range(ptr.id(), size as int)
-              && ptr.id() == dealloc@.ptr()
+              && points_to_raw@.is_range(ptr as int, size as int)
+              && points_to_raw@.provenance() == ptr@.provenance
+              && ptr == dealloc@.ptr()
               && dealloc@.inst() == local.instance
               && dealloc@.size() == size
         }),
@@ -77,7 +78,7 @@ pub fn page_free_collect(
         common_preserves(*old(local), *local),
         old(local).thread_token == local.thread_token,
 {
-    if force || page_ptr.get_ref(Tracked(&*local)).xthread_free.atomic.load() != 0 {
+    if force || page_ptr.get_ref(Tracked(&*local)).xthread_free.atomic.load().addr() != 0 {
         page_thread_free_collect(page_ptr, Tracked(&mut *local));
     }
 
@@ -184,12 +185,14 @@ fn page_free_list_extend(
     let pag_start = calculate_page_start(page_ptr, bsize);
     let start = calculate_page_block_at(pag_start, bsize, capacity as usize,
         Ghost(page_ptr.page_id@));
+    let start = page_ptr.page_ptr.with_addr(start) as *mut u8;
 
     //assert((capacity + extend) as usize as int == capacity + extend);
     let x = capacity as usize + extend - 1;
 
     let last = calculate_page_block_at(pag_start, bsize, x,
         Ghost(page_ptr.page_id@));
+    let last = page_ptr.page_ptr.with_addr(last) as *mut u8;
 
     let ghost rng_start = block_start_at(page_id, bsize as int, capacity as int);
     let ghost rng_size = extend * bsize;
@@ -310,7 +313,7 @@ fn page_free_list_extend(
     // TODO
 
     proof {
-        assert(start.id() % 8 == 0) by {
+        assert(start.addr() % 8 == 0) by {
             block_ptr_aligned_to_word();
             crate::linked_list::size_of_node();
             segment_start_mult8(page_id.segment_id);
@@ -324,14 +327,14 @@ fn page_free_list_extend(
             //    requires bsize % 8 == 0;
         }
         assert forall |i: int| cap_nat <= i < cap_nat + extend_nat
-            implies is_block_ptr(
+            implies is_block_ptr1(
                 block_start(block_tokens.index(i)@.key),
                 block_tokens.index(i)@.key,
             )
         by {
             let block_id = block_tokens.index(i)@.key;
             let block_size = bsize as int;
-            reveal(is_block_ptr);
+            reveal(is_block_ptr1);
             get_block_start_defn(block_id);
             crate::linked_list::size_of_node();
             start_offset_le_slice_size(block_size);
@@ -515,7 +518,7 @@ fn heap_delayed_free_partial(heap: HeapPtr, Tracked(local): Tracked<&mut Local>)
         let tracked dealloc_inner = MimDeallocInner {
             mim_instance: local.instance.clone(),
             mim_block: block,
-            ptr: ptr.id(),
+            ptr: ptr,
         };
         let (success, Tracked(p_opt), Tracked(d_opt)) =
                 crate::free::free_delayed_block(ptr, Tracked(perm),
@@ -526,9 +529,8 @@ fn heap_delayed_free_partial(heap: HeapPtr, Tracked(local): Tracked<&mut Local>)
             let tracked dealloc = d_opt.tracked_unwrap();
             let tracked block = dealloc.mim_block;
 
-            let ptr = PPtr::from_usize(ptr.to_usize());
             heap.get_ref(Tracked(&*local)).thread_delayed_free
-                .atomic_insert_block(ptr, Tracked(perm), Tracked(block));
+                .atomic_insert_block(ptr as *mut Node, Tracked(perm), Tracked(block));
         }
     }
     return all_freed;

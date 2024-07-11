@@ -3,7 +3,7 @@
 
 use state_machines_macros::*;
 use vstd::prelude::*;
-use vstd::ptr::*;
+use vstd::raw_ptr::*;
 use vstd::*;
 use crate::config::SLICE_SIZE;
 
@@ -18,15 +18,18 @@ verus!{
 
 pub ghost struct HeapId {
     pub id: nat,
+    pub provenance: Provenance,
     pub uniq: int,
 }
 
 pub ghost struct TldId {
     pub id: nat,
+    pub provenance: Provenance,
 }
 
 pub ghost struct SegmentId {
     pub id: nat,
+    pub provenance: Provenance,
     pub uniq: int,
 }
 
@@ -629,12 +632,12 @@ tokenized_state_machine!{ Mim {
     transition!{
         reserve_uniq_identifier() {
             birds_eye let u = heap_get_unused_uniq_field(pre.heap_shared_access.dom() + pre.reserved_uniq);
-            add reserved_uniq += set { HeapId { id: 0, uniq: u } }
+            add reserved_uniq += set { HeapId { id: 0, uniq: u, provenance: Provenance::null() } }
             by {
                 lemma_heap_get_unused_uniq_field(pre.heap_shared_access.dom() + pre.reserved_uniq);
-                if pre.reserved_uniq.contains(HeapId { id: 0, uniq: u }) {
+                if pre.reserved_uniq.contains(HeapId { id: 0, uniq: u, provenance: Provenance::null() }) {
                     assert((pre.heap_shared_access.dom() + pre.reserved_uniq)
-                        .contains(HeapId { id: 0, uniq: u }));
+                        .contains(HeapId { id: 0, uniq: u, provenance: Provenance::null() }));
                 }
             };
         }
@@ -646,7 +649,7 @@ tokenized_state_machine!{ Mim {
             thread_state: ThreadState,
         ) {
             remove right_to_use_thread -= set { thread_id };
-            remove reserved_uniq -= set { HeapId { id: 0, uniq: thread_state.heap_id.uniq } };
+            remove reserved_uniq -= set { HeapId { id: 0, uniq: thread_state.heap_id.uniq, provenance: Provenance::null() } };
             require thread_state.pages.dom() =~= Set::empty();
             require thread_state.segments.dom() =~= Set::empty();
             have my_inst >= Some(let inst);
@@ -675,7 +678,7 @@ tokenized_state_machine!{ Mim {
 
     pub closed spec fn mk_fresh_segment_id(tos: Map<SegmentId, ThreadId>, sid: SegmentId) -> SegmentId {
         let uniq = segment_get_unused_uniq_field(tos.dom());
-        SegmentId { id: sid.id, uniq: uniq }
+        SegmentId { id: sid.id, provenance: sid.provenance, uniq: uniq }
     }
 
     transition!{
@@ -690,7 +693,7 @@ tokenized_state_machine!{ Mim {
             birds_eye let real_segment_id = Self::mk_fresh_segment_id(pre.thread_of_segment,pre_segment_id);
             assert !ts.segments.dom().contains(real_segment_id)
               by { lemma_segment_get_unused_uniq_field(pre.thread_of_segment.dom()); };
-            assert pre_segment_id.id == real_segment_id.id;
+            assert pre_segment_id.id == real_segment_id.id && pre_segment_id.provenance == real_segment_id.provenance;
             let new_segments = ts.segments.insert(real_segment_id, segment_state);
             let ts2 = ThreadState { segments: new_segments, .. ts };
             add thread_local_state += [ thread_id => ts2 ];
@@ -1085,7 +1088,7 @@ tokenized_state_machine!{ Mim {
 
     #[invariant]
     pub closed spec fn inv_reserved(&self) -> bool {
-        (forall |heap_id: HeapId| self.reserved_uniq.contains(heap_id) ==> heap_id.id == 0)
+        (forall |heap_id: HeapId| self.reserved_uniq.contains(heap_id) ==> heap_id.id == 0 && heap_id.provenance == Provenance::null())
     }
 
     #[invariant]

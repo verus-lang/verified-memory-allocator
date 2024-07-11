@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 
 use vstd::prelude::*;
-use vstd::ptr::*;
+use vstd::raw_ptr::*;
 use vstd::*;
 use vstd::modes::*;
 

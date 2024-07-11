@@ -1,7 +1,7 @@
 use core::intrinsics::{unlikely, likely};
 use vstd::prelude::*;
 use vstd::set_lib::*;
-use vstd::ptr::*;
+use vstd::raw_ptr::*;
 use crate::config::*;
 use crate::os_mem::*;
 use crate::layout::*;
@@ -11,14 +11,15 @@ use vstd::set_lib::set_int_range;
 
 verus!{
 
-pub fn os_commit(addr: usize, size: usize, Tracked(mem): Tracked<&mut MemChunk>)
+pub fn os_commit(addr: *mut u8, size: usize, Tracked(mem): Tracked<&mut MemChunk>)
     -> (res: (bool, bool))
     requires old(mem).wf(), 
         old(mem).os_has_range(addr as int, size as int),
         addr as int % page_size() == 0,
         size as int % page_size() == 0,
-        addr != 0,
-        addr + size <= usize::MAX,
+        addr as int != 0,
+        addr as int + size <= usize::MAX,
+        addr@.provenance == old(mem).points_to.provenance(),
         //old(mem).has_pointsto_for_all_read_write(),
     ensures ({
         let (success, is_zero) = res;
@@ -27,34 +28,35 @@ pub fn os_commit(addr: usize, size: usize, Tracked(mem): Tracked<&mut MemChunk>)
         //&& (success ==> mem.os_has_range_read_write(addr as int, size as int))
         && mem.has_new_pointsto(&*old(mem))
         && mem.os.dom() == old(mem).os.dom()
-
-        && (success ==>
-            mem.os_has_range_read_write(addr as int, size as int))
+        && mem.points_to.provenance() == old(mem).points_to.provenance()
+        && (success ==> mem.os_has_range_read_write(addr as int, size as int))
     })
 {
     os_commitx(addr, size, true, false, Tracked(&mut *mem))
 }
 
-pub fn os_decommit(addr: usize, size: usize, Tracked(mem): Tracked<&mut MemChunk>)
+pub fn os_decommit(addr: *mut u8, size: usize, Tracked(mem): Tracked<&mut MemChunk>)
     -> (success: bool)
     requires old(mem).wf(), 
         old(mem).os_has_range(addr as int, size as int),
         old(mem).pointsto_has_range(addr as int, size as int),
         addr as int % page_size() == 0,
         size as int % page_size() == 0,
-        addr != 0,
-        addr + size <= usize::MAX,
+        addr as int != 0,
+        addr as int + size <= usize::MAX,
+        addr@.provenance == old(mem).points_to.provenance(),
     ensures
         mem.wf(),
         mem.os.dom() =~= old(mem).os.dom(),
 
-        mem.points_to@.dom().subset_of(old(mem).points_to@.dom()),
+        mem.points_to.dom().subset_of(old(mem).points_to.dom()),
         mem.os_rw_bytes().subset_of(old(mem).os_rw_bytes()),
+        mem.points_to.provenance() == old(mem).points_to.provenance(),
 
-        old(mem).points_to@.dom() - mem.points_to@.dom()
+        old(mem).points_to.dom() - mem.points_to.dom()
             =~= old(mem).os_rw_bytes() - mem.os_rw_bytes(),
         old(mem).os_rw_bytes() - mem.os_rw_bytes()
-            <= set_int_range(addr as int, addr + size),
+            <= set_int_range(addr as int, addr as int + size),
 {
     let tracked mut t = mem.split(addr as int, size as int);
     let ghost t1 = t;
@@ -66,7 +68,7 @@ pub fn os_decommit(addr: usize, size: usize, Tracked(mem): Tracked<&mut MemChunk
         assert forall |p| mem.os_rw_bytes().contains(p)
             implies old(mem).os_rw_bytes().contains(p)
         by {
-            if addr <= p < addr + size {
+            if addr as int <= p < addr as int + size {
                 assert(t1.os_rw_bytes().contains(p));
                 assert(t.os_rw_bytes().contains(p));
                 assert(old(mem).os_rw_bytes().contains(p));
@@ -74,13 +76,13 @@ pub fn os_decommit(addr: usize, size: usize, Tracked(mem): Tracked<&mut MemChunk
                 assert(old(mem).os_rw_bytes().contains(p));
             }
         }
-        assert_sets_equal!(old(mem).points_to@.dom() - mem.points_to@.dom(),
+        assert_sets_equal!(old(mem).points_to.dom() - mem.points_to.dom(),
             old(mem).os_rw_bytes() - mem.os_rw_bytes(),
             p =>
         {
-            if (old(mem).points_to@.dom() - mem.points_to@.dom()).contains(p) {
-                if addr <= p < addr + size {
-                    assert((t1.points_to@.dom() - t.points_to@.dom()).contains(p));
+            if (old(mem).points_to.dom() - mem.points_to.dom()).contains(p) {
+                if addr as int <= p < addr as int + size {
+                    assert((t1.points_to.dom() - t.points_to.dom()).contains(p));
                     assert((t1.os_rw_bytes() - t.os_rw_bytes()).contains(p));
                     assert((old(mem).os_rw_bytes() - mem.os_rw_bytes()).contains(p));
                 } else {
@@ -88,12 +90,12 @@ pub fn os_decommit(addr: usize, size: usize, Tracked(mem): Tracked<&mut MemChunk
                 }
             }
             if (old(mem).os_rw_bytes() - mem.os_rw_bytes()).contains(p) {
-                if addr <= p < addr + size {
+                if addr as int <= p < addr as int + size {
                     assert((t1.os_rw_bytes() - t.os_rw_bytes()).contains(p));
-                    assert((t1.points_to@.dom() - t.points_to@.dom()).contains(p));
-                    assert((old(mem).points_to@.dom() - mem.points_to@.dom()).contains(p));
+                    assert((t1.points_to.dom() - t.points_to.dom()).contains(p));
+                    assert((old(mem).points_to.dom() - mem.points_to.dom()).contains(p));
                 } else {
-                    assert((old(mem).points_to@.dom() - mem.points_to@.dom()).contains(p));
+                    assert((old(mem).points_to.dom() - mem.points_to.dom()).contains(p));
                 }
             }
         });
@@ -141,37 +143,39 @@ fn os_page_align_areax(conservative: bool, addr: usize, size: usize)
 }
 
 fn os_commitx(
-    addr: usize, size: usize, commit: bool, conservative: bool,
+    addr: *mut u8, size: usize, commit: bool, conservative: bool,
     Tracked(mem): Tracked<&mut MemChunk>
 ) -> (res: (bool, bool))
     requires old(mem).wf(), 
         old(mem).os_has_range(addr as int, size as int),
-        addr as int % page_size() == 0,
-        size as int % page_size() == 0,
-        addr != 0,
-        addr + size <= usize::MAX,
+        addr as int % page_size() as int == 0,
+        size as int % page_size() as int == 0,
+        addr as int != 0,
+        addr as int + size <= usize::MAX,
         !commit ==> old(mem).pointsto_has_range(addr as int, size as int),
+        addr@.provenance == old(mem).points_to.provenance()
     ensures
         mem.wf(),
         mem.os.dom() =~= old(mem).os.dom(),
         commit ==> mem.has_new_pointsto(&*old(mem)),
         commit ==> res.0 ==> mem.os_has_range_read_write(addr as int, size as int),
-        !commit ==> mem.points_to@.dom().subset_of(old(mem).points_to@.dom()),
+        !commit ==> mem.points_to.dom().subset_of(old(mem).points_to.dom()),
         !commit ==> mem.os_rw_bytes().subset_of(old(mem).os_rw_bytes()),
-        !commit ==> old(mem).points_to@.dom() - mem.points_to@.dom()
+        !commit ==> old(mem).points_to.dom() - mem.points_to.dom()
                     =~= old(mem).os_rw_bytes() - mem.os_rw_bytes(),
+        mem.points_to.provenance() == old(mem).points_to.provenance()
 {
     let is_zero = false;
-    let (start, csize) = os_page_align_areax(conservative, addr, size);
+    let (start, csize) = os_page_align_areax(conservative, addr.addr(), size);
     if csize == 0 {
         return (true, is_zero);
     }
     let err = 0;
 
-    let p = PPtr::from_usize(start);
+    let p = addr.with_addr(start);
 
     let tracked weird_extra = mem.take_points_to_set(
-          mem.points_to@.dom() - mem.os_rw_bytes());
+          mem.points_to.dom() - mem.os_rw_bytes());
     let tracked mut exact_mem = mem.split(addr as int, size as int);
     let ghost em = exact_mem;
 
@@ -189,9 +193,9 @@ fn os_commitx(
         if commit {
         }
         if !commit {
-            /*assert(em.points_to@.dom()
+            /*assert(em.points_to.dom()
                 =~= set_int_range(addr as int, addr + size as int));
-            assert(em.points_to@.dom() - exact_mem.points_to@.dom()
+            assert(em.points_to.dom() - exact_mem.points_to.dom()
                 =~= set_int_range(addr as int, addr + size as int));
 
             assert(exact_mem.range_os_rw().disjoint(exact_mem.range_os_none()));
@@ -200,7 +204,7 @@ fn os_commitx(
             assert(em.os_rw_bytes() - exact_mem.os_rw_bytes()
                 =~= set_int_range(addr as int, addr + size as int));
 
-            assert(old(mem).points_to@.dom() - mem.points_to@.dom()
+            assert(old(mem).points_to.dom() - mem.points_to.dom()
                 =~= set_int_range(addr as int, addr + size as int));
             assert(old(mem).os_rw_bytes() - mem.os_rw_bytes()
                 =~= set_int_range(addr as int, addr + size as int));

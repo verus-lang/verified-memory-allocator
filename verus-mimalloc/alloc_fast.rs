@@ -3,7 +3,7 @@
 use core::intrinsics::{unlikely, likely};
 
 use vstd::prelude::*;
-use vstd::ptr::*;
+use vstd::raw_ptr::*;
 use vstd::*;
 use vstd::modes::*;
 use vstd::set_lib::*;
@@ -28,7 +28,7 @@ verus!{
 
 #[inline]
 pub fn heap_malloc(heap: HeapPtr, size: usize, Tracked(local): Tracked<&mut Local>)  // $line_count$Trusted$
-    -> (t: (PPtr<u8>, Tracked<PointsToRaw>, Tracked<MimDealloc>)) // $line_count$Trusted$
+    -> (t: (*mut u8, Tracked<PointsToRaw>, Tracked<MimDealloc>)) // $line_count$Trusted$
     requires // $line_count$Trusted$
         old(local).wf(), // $line_count$Trusted$
         heap.wf(), // $line_count$Trusted$
@@ -41,8 +41,9 @@ pub fn heap_malloc(heap: HeapPtr, size: usize, Tracked(local): Tracked<&mut Loca
             let (ptr, points_to_raw, dealloc) = t; // $line_count$Trusted$
 
             dealloc@.wf() // $line_count$Trusted$
-              && points_to_raw@.is_range(ptr.id(), size as int)  // $line_count$Trusted$
-              && ptr.id() == dealloc@.ptr()  // $line_count$Trusted$
+              && points_to_raw@.is_range(ptr as int, size as int)  // $line_count$Trusted$
+              && points_to_raw@.provenance() == ptr@.provenance  // $line_count$Trusted$
+              && ptr == dealloc@.ptr()  // $line_count$Trusted$
               && dealloc@.inst() == local.inst()  // $line_count$Trusted$
               && dealloc@.size() == size  // $line_count$Trusted$
         })  // $line_count$Trusted$
@@ -52,7 +53,7 @@ pub fn heap_malloc(heap: HeapPtr, size: usize, Tracked(local): Tracked<&mut Loca
 
 #[inline]
 pub fn heap_malloc_zero(heap: HeapPtr, size: usize, zero: bool, Tracked(local): Tracked<&mut Local>)
-    -> (t: (PPtr<u8>, Tracked<PointsToRaw>, Tracked<MimDealloc>))
+    -> (t: (*mut u8, Tracked<PointsToRaw>, Tracked<MimDealloc>))
     requires
         old(local).wf(),
         heap.wf(),
@@ -62,8 +63,9 @@ pub fn heap_malloc_zero(heap: HeapPtr, size: usize, zero: bool, Tracked(local): 
         ({
             let (ptr, points_to_raw, dealloc) = t;
             dealloc@.wf()
-              && points_to_raw@.is_range(ptr.id(), size as int)
-              && ptr.id() == dealloc@.ptr()
+              && points_to_raw@.is_range(ptr as int, size as int)
+              && points_to_raw@.provenance() == ptr@.provenance
+              && ptr == dealloc@.ptr()
               && dealloc@.inst() == local.inst()
               && dealloc@.size() == size
         }),
@@ -74,7 +76,7 @@ pub fn heap_malloc_zero(heap: HeapPtr, size: usize, zero: bool, Tracked(local): 
 
 #[inline]
 pub fn heap_malloc_zero_ex(heap: HeapPtr, size: usize, zero: bool, huge_alignment: usize, Tracked(local): Tracked<&mut Local>)
-    -> (t: (PPtr<u8>, Tracked<PointsToRaw>, Tracked<MimDealloc>))
+    -> (t: (*mut u8, Tracked<PointsToRaw>, Tracked<MimDealloc>))
     requires
         old(local).wf(),
         heap.wf(),
@@ -84,8 +86,9 @@ pub fn heap_malloc_zero_ex(heap: HeapPtr, size: usize, zero: bool, huge_alignmen
         ({
             let (ptr, points_to_raw, dealloc) = t;
             dealloc@.wf()
-              && points_to_raw@.is_range(ptr.id(), size as int)
-              && ptr.id() == dealloc@.ptr()
+              && points_to_raw@.is_range(ptr as int, size as int)
+              && points_to_raw@.provenance() == ptr@.provenance
+              && ptr == dealloc@.ptr()
               && dealloc@.inst() == local.instance
               && dealloc@.size() == size
         }),
@@ -103,7 +106,7 @@ pub fn heap_get_free_small_page(heap: HeapPtr, size: usize, Tracked(local): Trac
     requires 0 <= size <= SMALL_SIZE_MAX,
         local.wf_main(), heap.is_in(*local), heap.wf(),
     ensures
-        !page.is_empty_global(*local) ==> ({
+        page.is_empty_global(*local) || ({
           &&& page.wf()
           &&& Some(page.page_id@) == 
             local.page_organization.used_dlist_headers[smallest_bin_fitting_size((size + 7) / 8 * 8)].first
@@ -115,15 +118,17 @@ pub fn heap_get_free_small_page(heap: HeapPtr, size: usize, Tracked(local): Trac
     let ghost bin_idx = smallest_bin_fitting_size((size + 7) / 8 * 8);
     let ghost page_id = 
         local.page_organization.used_dlist_headers[bin_idx].first.unwrap();
-    let page_ptr = PagePtr { page_ptr: ptr, page_id: Ghost(page_id) };
     proof {
         bounds_for_smallest_bin_fitting_size((size + 7) / 8 * 8);
-        if page_ptr.page_ptr.id() != local.page_empty_global@.s.points_to@.pptr {
+        //if page_ptr.page_ptr.addr() != local.page_empty_global@.s.points_to.ptr().addr() {
             //assert(local.heap.pages_free_direct@.value.unwrap()@[idx as int].id()
             //    == local.heap.pages@.value.unwrap()@[bin_idx].first.id());
             //assert(local.heap.pages@.value.unwrap()@[bin_idx].first.id() != 0);
-        }
+        //}
     }
+    let ptr = with_exposed_provenance(ptr.addr(), Tracked(if ptr as int == local.page_empty_global@.s.points_to.ptr() as int { local.page_empty_global.borrow().s.exposed } else { local.instance.thread_local_state_guards_page(local.thread_id, page_id, &local.thread_token).exposed }));
+    let page_ptr = PagePtr { page_ptr: ptr, page_id: Ghost(page_id) };
+
     return page_ptr;
 }
 
@@ -133,7 +138,7 @@ pub fn heap_malloc_small_zero(
     size: usize,
     zero: bool,
     Tracked(local): Tracked<&mut Local>,
-) -> (t: (PPtr<u8>, Tracked<PointsToRaw>, Tracked<MimDealloc>))
+) -> (t: (*mut u8, Tracked<PointsToRaw>, Tracked<MimDealloc>))
     requires
         old(local).wf(),
         heap.wf(),
@@ -144,8 +149,9 @@ pub fn heap_malloc_small_zero(
         ({
             let (ptr, points_to_raw, dealloc) = t;
             dealloc@.wf()
-              && points_to_raw@.is_range(ptr.id(), size as int)
-              && ptr.id() == dealloc@.ptr()
+              && points_to_raw@.is_range(ptr as int, size as int)
+              && points_to_raw@.provenance() == ptr@.provenance
+              && ptr == dealloc@.ptr()
               && dealloc@.inst() == local.instance
               && dealloc@.size() == size
         }),
@@ -182,7 +188,7 @@ pub fn page_malloc(
     zero: bool,
 
     Tracked(local): Tracked<&mut Local>,
-) -> (t: (PPtr<u8>, Tracked<PointsToRaw>, Tracked<MimDealloc>))
+) -> (t: (*mut u8, Tracked<PointsToRaw>, Tracked<MimDealloc>))
     requires
         old(local).wf(),
         heap.wf(),
@@ -198,8 +204,9 @@ pub fn page_malloc(
             let (ptr, points_to_raw, dealloc) = t;
 
             dealloc@.wf()
-              && points_to_raw@.is_range(ptr.id(), size as int)
-              && ptr.id() == dealloc@.ptr()
+              && points_to_raw@.is_range(ptr as int, size as int)
+              && points_to_raw@.provenance() == ptr@.provenance
+              && ptr == dealloc@.ptr()
               && dealloc@.inst() == local.instance
               && dealloc@.size() == size
         }),
@@ -262,7 +269,7 @@ pub fn page_malloc(
         let tracked dealloc_inner = MimDeallocInner {
             mim_instance: local.instance.clone(),
             mim_block: block,
-            ptr: ptr.id(),
+            ptr: ptr,
         };
         let tracked (dealloc0, points_to_raw0) = dealloc_inner.into_user(points_to_r, size as int);
 

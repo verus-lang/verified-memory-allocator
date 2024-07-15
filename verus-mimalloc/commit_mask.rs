@@ -33,7 +33,7 @@ spec fn div64(x: usize) -> usize { x / 64 }
 
 #[verifier::opaque]
 spec fn is_bit_set(a: usize, b: usize) -> bool {
-    a & (1 << b) == (1 << b)
+    a & (1usize << b) == (1usize << b)
 }
 
 #[allow(unused_macros)]
@@ -48,13 +48,13 @@ proof fn lemma_bitmask_to_is_bit_set(n: usize, o: usize)
         n < 64,
         o <= 64 - n,
     ensures ({
-        let m = sub(1 << n, 1) << o;
+        let m = sub(1usize << n, 1) << o;
         &&& forall|j: usize| j < o           ==> !is_bit_set(m, j)
         &&& forall|j: usize| o <= j < o + n  ==> is_bit_set(m, j)
         &&& forall|j: usize| o + n <= j < 64 ==> !is_bit_set(m, j)
     })
 {
-    let m = (sub(1 << n, 1) << o) as usize;
+    let m = (sub(1usize << n, 1) << o) as usize;
     assert forall|j: usize| {
         &&& (j < o           ==> !is_bit_set(m, j))
         &&& (o <= j < o + n  ==> is_bit_set(m, j))
@@ -64,11 +64,11 @@ proof fn lemma_bitmask_to_is_bit_set(n: usize, o: usize)
         reveal(is_bit_set);
         if j < 64 {
             assert(j < o               ==> !is_bit_set!(m, j)) by (bit_vector)
-                requires j < 64, m == (sub(1 << n, 1) << o) as u64;
+                requires j < 64, m == (sub(1u64 << n, 1) << o) as u64;
             assert(o <= j < add(o, n)  ==> is_bit_set!(m, j)) by (bit_vector)
-                requires j < 64, m == (sub(1 << n, 1) << o) as u64;
+                requires j < 64, m == (sub(1u64 << n, 1) << o) as u64;
             assert(add(o, n) <= j < 64 ==> !is_bit_set!(m, j)) by (bit_vector)
-                requires n < 64, j < 64, m == (sub(1 << n, 1) << o) as u64;
+                requires n < 64, j < 64, m == (sub(1u64 << n, 1) << o) as u64;
         } else { }
     }
 }
@@ -125,7 +125,7 @@ proof fn lemma_obtain_bit_index_2(a: usize) -> (b: usize)
     let b = lemma_obtain_bit_index_1(!a) as u64;
     let a = a as u64;
     assert(!is_bit_set!(a, b)) by (bit_vector)
-        requires b < 64 && !a & (1 << b) == (1 << b);
+        requires b < 64 && !a & (1u64 << b) == (1usize << b);
     b as usize
 }
 

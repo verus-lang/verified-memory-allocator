@@ -307,6 +307,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
             mim_instance == dealloc.mim_instance,
             mim_instance == local.instance,
             perm.is_range(ptr as int, dealloc.block_id().block_size as int),
+            perm.provenance() == ptr@.provenance,
             ptr as *mut u8 == dealloc.ptr,
             is_page_ptr(page.page_ptr, dealloc.block_id().page_id),
             local.wf(),

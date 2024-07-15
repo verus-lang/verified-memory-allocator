@@ -370,6 +370,7 @@ pub proof fn mk_segment_id(p: *mut SegmentHeader) -> (id: SegmentId)
     requires p as int >= 0,
         p as int % SEGMENT_SIZE as int == 0,
         ((p as int + SEGMENT_SIZE as int) < usize::MAX),
+        p@.metadata == Metadata::Thin,
     ensures is_segment_ptr(p, id),
 {
     const_facts();

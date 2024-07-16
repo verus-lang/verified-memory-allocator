@@ -127,7 +127,7 @@ impl LL {
 
     pub closed spec fn wf(&self) -> bool {
         &&& (forall |i: nat| self.perms@.dom().contains(i) ==> 0 <= i < self.data@.len)
-        &&& self.first == self.next_ptr(self.data@.len)
+        &&& self.first.addr() == self.next_ptr(self.data@.len).addr()
         &&& (forall |i: nat| self.valid_node(i, #[trigger] self.next_ptr(i)))
     }
 

@@ -373,6 +373,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
         }
 
         assert(pag.xthread_free.instance == mim_instance);
+        let Tracked(exposed) = expose_provenance(mask1);
 
         let cas_result = atomic_with_ghost!(
             &pag.xthread_free.atomic => compare_exchange_weak(mask, mask1);
@@ -404,7 +405,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
                     let tracked mim_block = mim_block_opt.tracked_unwrap();
                     assert(ptr_mem.unwrap().ptr() == ptr);
                     ghost_ll.ghost_insert_block(ptr, ptr_mem.tracked_unwrap(),
-                        raw_mem.tracked_unwrap(), mim_block);
+                        raw_mem.tracked_unwrap(), mim_block, exposed);
 
                     mim_block_opt = None;
 

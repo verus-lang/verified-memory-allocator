@@ -71,7 +71,7 @@ pub struct LL {
     data: Ghost<LLData>,
 
     // first to be popped off goes at the end
-    perms: Tracked<Map<nat, (PointsTo<Node>, PointsToRaw, Mim::block)>>,
+    perms: Tracked<Map<nat, (PointsTo<Node>, PointsToRaw, Mim::block, IsExposed)>>,
 }
 
 pub tracked struct LLGhostStateToReconvene {
@@ -94,17 +94,18 @@ impl LL {
     pub closed spec fn valid_node(&self, i: nat, next_ptr: *mut Node) -> bool {
         0 <= i < self.data@.len ==> (
             self.perms@.dom().contains(i) && {
-                  let (perm, padding, block_token) = self.perms@.index(i);
+                  let (perm, padding, block_token, is_exposed) = self.perms@.index(i);
 
                   // Each node points to the next node
                   perm.is_init()
-                  && perm.value().ptr == next_ptr
+                  && perm.value().ptr.addr() == next_ptr.addr()
 
                   // The PointsToRaw makes up the rest of the block size allocation
                   && block_token@.key.block_size - size_of::<Node>() >= 0
                   && padding.is_range(perm.ptr().addr() + size_of::<Node>(),
                       block_token@.key.block_size - size_of::<Node>())
                   && padding.provenance() == perm.ptr()@.provenance
+                  && is_exposed.provenance() == padding.provenance()
 
                   // block_token is correct
                   && block_token@.instance == self.data@.instance
@@ -201,9 +202,10 @@ impl LL {
         let ptr = ptr as *mut Node;
         ptr_mut_write(ptr, Tracked(&mut mem1), Node { ptr: self.first });
         self.first = ptr;
+        let Tracked(is_exposed) = expose_provenance(ptr);
 
         proof {
-            let tracked tuple = (mem1, mem2, block_token);
+            let tracked tuple = (mem1, mem2, block_token, is_exposed);
             self.perms.borrow_mut().tracked_insert(self.data@.len, tuple);
             self.data@.len = self.data@.len + 1;
 
@@ -251,6 +253,7 @@ impl LL {
         tracked points_to_ptr: PointsTo<Node>,
         tracked points_to_raw: PointsToRaw,
         tracked block_token: Mim::block,
+        tracked is_exposed: IsExposed,
      )
         requires old(self).wf(),
             block_token@.instance == old(self).instance(),
@@ -259,12 +262,13 @@ impl LL {
             // Require that the pointer has already been written:
             points_to_ptr.ptr() == ptr,
             points_to_ptr.is_init(),
-            points_to_ptr.value().ptr == old(self).ptr(),
+            points_to_ptr.value().ptr.addr() == old(self).ptr().addr(),
 
             // Require the padding to be correct
             points_to_raw.is_range(
                 ptr as int + size_of::<Node>(),
                 block_token@.key.block_size - size_of::<Node>()),
+            points_to_raw.provenance() == is_exposed.provenance(),
             points_to_raw.provenance() == ptr@.provenance,
             block_token@.key.block_size - size_of::<Node>() >= 0,
 
@@ -288,7 +292,7 @@ impl LL {
     {
         self.first = ptr;
 
-        let tracked tuple = (points_to_ptr, points_to_raw, block_token);
+        let tracked tuple = (points_to_ptr, points_to_raw, block_token, is_exposed);
         self.perms.borrow_mut().tracked_insert(self.data@.len, tuple);
         self.data@.len = self.data@.len + 1;
 
@@ -386,7 +390,7 @@ impl LL {
             let i = (self.data@.len - 1) as nat;
             assert(self.valid_node(i, self.next_ptr(i)));
         }
-        let tracked (mut points_to_node, points_to_raw, block) = self.perms.borrow_mut().tracked_remove((self.data@.len - 1) as nat);
+        let tracked (mut points_to_node, points_to_raw, block, is_exposed) = self.perms.borrow_mut().tracked_remove((self.data@.len - 1) as nat);
 
         let ptr = self.first;
         let node = ptr_mut_read(ptr, Tracked(&mut points_to_node));
@@ -594,12 +598,12 @@ impl LL {
 
         assert(other.valid_node(0, other.next_ptr(0)));
         let tracked mut perm = other.perms.borrow_mut().tracked_remove(0);
-        let tracked (mut a, b, c) = perm;
+        let tracked (mut a, b, c, exposed) = perm;
         let _ = ptr_mut_read(p, Tracked(&mut a));
         ptr_mut_write(p, Tracked(&mut a), Node { ptr: self.first });
 
         proof {
-            other.perms.borrow_mut().tracked_insert(0, (a, b, c));
+            other.perms.borrow_mut().tracked_insert(0, (a, b, c, exposed));
 
             let other_len = other.data@.len;
             let self_len = self.data@.len;
@@ -732,12 +736,13 @@ impl LL {
         // based on mi_page_free_list_extend
 
         let tracked mut points_to_raw = PointsToRaw::empty(start@.provenance);
-        let tracked mut new_map: Map<nat, (PointsTo<Node>, PointsToRaw, Mim::block)> = Map::tracked_empty();
+        let tracked mut new_map: Map<nat, (PointsTo<Node>, PointsToRaw, Mim::block, IsExposed)> = Map::tracked_empty();
         proof {
             tracked_swap(&mut points_to_raw, points_to_raw_r);
         }
 
         let mut block = start.addr();
+        let Tracked(exposed) = expose_provenance(start);
         let ghost mut i: int = 0;
         let ghost tokens_snap = *tokens;
         while block < last.addr()
@@ -749,6 +754,7 @@ impl LL {
               points_to_raw.provenance() == start@.provenance,
               start@.metadata == Metadata::Thin,
               start@.provenance == self.data@.page_id.segment_id.provenance,
+              start@.provenance == exposed.provenance(),
               INTPTR_SIZE as int <= bsize,
               block as int % INTPTR_SIZE as int == 0,
               bsize as int % INTPTR_SIZE as int == 0,
@@ -813,7 +819,7 @@ impl LL {
                 let ghost the_key = (self.data@.len + extend - 1 - i) as nat;
                 new_map.tracked_insert(
                     (self.data@.len + extend - 1 - i) as nat,
-                    (points_to_node, points_to2, block));
+                    (points_to_node, points_to2, block, exposed));
                 i = i + 1;
 
                 /*assert forall
@@ -887,7 +893,7 @@ impl LL {
             let ghost the_key = (self.data@.len + extend - 1 - i) as nat;
             new_map.tracked_insert(
                 (self.data@.len + extend - 1 - i) as nat,
-                (points_to_node, points_to2, block));
+                (points_to_node, points_to2, block, exposed));
 
             let old_len = self.data@.len;
             self.data@.len = self.data@.len + extend;
@@ -897,7 +903,7 @@ impl LL {
                 set_int_range(cap as int, cap as int + extend)));
             assert forall |j: nat| self.valid_node(j, #[trigger] self.next_ptr(j))
             by {
-                let (perm, padding, block_token) = self.perms@.index(j);
+                let (perm, padding, block_token, exposed) = self.perms@.index(j);
                 if j < old_len {
                     assert(old(self).valid_node(j, old(self).next_ptr(j)));
                     assert(!new_map.dom().contains(j));
@@ -926,7 +932,7 @@ impl LL {
 
                     assert(self.valid_node(j, self.next_ptr(j)));
                 } else if j < self.data@.len {
-                    let (perm, padding, block_token) = self.perms@.index(j);
+                    let (perm, padding, block_token, exposed) = self.perms@.index(j);
                     let next_ptr = self.next_ptr(j);
 
                     assert(block_token@.key.block_size == bsize);
@@ -1033,7 +1039,7 @@ impl LL {
     }
 
     pub proof fn convene_pt_map(
-        tracked m: Map<nat, (PointsTo<Node>, PointsToRaw, Mim::block)>,
+        tracked m: Map<nat, (PointsTo<Node>, PointsToRaw, Mim::block, IsExposed)>,
         len: nat,
         instance: Mim::Instance,
         page_id: PageId,
@@ -1042,12 +1048,13 @@ impl LL {
         requires
             forall |i: nat| (#[trigger] m.dom().contains(i) <==> 0 <= i < len)
               && (m.dom().contains(i) ==> ({
-                  let (perm, padding, block_token) = m[i];
+                  let (perm, padding, block_token, exposed) = m[i];
                     perm.is_init()
                     && block_token@.key.block_size - size_of::<Node>() >= 0
                     && padding.is_range(perm.ptr() as int + size_of::<Node>(),
                         block_token@.key.block_size - size_of::<Node>())
                     && padding.provenance() == page_id.segment_id.provenance
+                    && padding.provenance() == exposed.provenance()
                     && block_token@.instance == instance
                     && is_block_ptr(perm.ptr() as *mut u8, block_token@.key)
                     && block_token@.key.page_id == page_id
@@ -1078,7 +1085,7 @@ impl LL {
             let i = (len - 1) as nat;
             let tracked mut m = m;
             assert(m.dom().contains(i));
-            let tracked (mut perm, padding, block_token) = m.tracked_remove(i);
+            let tracked (mut perm, padding, block_token, exposed) = m.tracked_remove(i);
             let tracked mut m2 = Self::convene_pt_map(m, i, instance, page_id, block_size);
             crate::layout::get_block_start_from_is_block_ptr(perm.ptr() as *mut u8, block_token@.key);
             perm.leak_contents();
@@ -1540,6 +1547,8 @@ impl ThreadLLSimple {
         let tracked mut points_to_raw = points_to_raw;
         let tracked mut block_token_opt = Some(block_token);
 
+        let Tracked(exposed) = expose_provenance(ptr);
+
         loop
             invariant_except_break
                 block_token_opt == Some(block_token),
@@ -1548,6 +1557,7 @@ impl ThreadLLSimple {
                 points_to_raw.is_range(ptr as int, block_token@.key.block_size as int),
                 points_to_raw.provenance() == ptr@.provenance,
                 ptr@.metadata == Metadata::Thin,
+                exposed.provenance() == ptr@.provenance,
 
                 block_token@.instance == self.instance,
                 block_token@.value.heap_id == Some(self.heap_id@),
@@ -1575,7 +1585,7 @@ impl ThreadLLSimple {
 
                 if ok {
                     let tracked block_token = block_token_opt.tracked_unwrap();
-                    ghost_ll.ghost_insert_block(ptr, ptr_mem, raw_mem, block_token);
+                    ghost_ll.ghost_insert_block(ptr, ptr_mem, raw_mem, block_token, exposed);
                     block_token_opt = None;
 
                     points_to_raw = PointsToRaw::empty(ptr@.provenance);

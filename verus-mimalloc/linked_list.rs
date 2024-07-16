@@ -99,6 +99,7 @@ impl LL {
                   // Each node points to the next node
                   perm.is_init()
                   && perm.value().ptr.addr() == next_ptr.addr()
+                  && perm.value().ptr@.metadata == Metadata::Thin
 
                   // The PointsToRaw makes up the rest of the block size allocation
                   && block_token@.key.block_size - size_of::<Node>() >= 0
@@ -110,6 +111,7 @@ impl LL {
                   // block_token is correct
                   && block_token@.instance == self.data@.instance
                   && is_block_ptr(perm.ptr() as *mut u8, block_token@.key)
+                  && perm.ptr()@.metadata == Metadata::Thin
 
                   && (self.data@.fixed_page ==> (
                       block_token@.key.page_id == self.data@.page_id
@@ -128,6 +130,7 @@ impl LL {
     pub closed spec fn wf(&self) -> bool {
         &&& (forall |i: nat| self.perms@.dom().contains(i) ==> 0 <= i < self.data@.len)
         &&& self.first.addr() == self.next_ptr(self.data@.len).addr()
+        &&& self.first@.metadata == Metadata::Thin
         &&& (forall |i: nat| self.valid_node(i, #[trigger] self.next_ptr(i)))
     }
 
@@ -263,6 +266,7 @@ impl LL {
             points_to_ptr.ptr() == ptr,
             points_to_ptr.is_init(),
             points_to_ptr.value().ptr.addr() == old(self).ptr().addr(),
+            points_to_ptr.value().ptr@.metadata == Metadata::Thin,
 
             // Require the padding to be correct
             points_to_raw.is_range(
@@ -271,6 +275,7 @@ impl LL {
             points_to_raw.provenance() == is_exposed.provenance(),
             points_to_raw.provenance() == ptr@.provenance,
             block_token@.key.block_size - size_of::<Node>() >= 0,
+            ptr@.metadata == Metadata::Thin,
 
             old(self).fixed_page() ==> (
                 block_token@.key.page_id == old(self).page_id()
@@ -392,7 +397,11 @@ impl LL {
         }
         let tracked (mut points_to_node, points_to_raw, block, is_exposed) = self.perms.borrow_mut().tracked_remove((self.data@.len - 1) as nat);
 
-        let ptr = self.first;
+        let ptr: *mut Node = with_exposed_provenance(self.first.addr(), Tracked(is_exposed));
+        //assert(ptr.addr() == points_to_node.ptr().addr());
+        //assert(points_to_node.ptr()@.metadata == Metadata::Thin);
+        //assert(ptr@.metadata == points_to_node.ptr()@.metadata);
+        //assert(ptr@.provenance == points_to_node.ptr()@.provenance);
         let node = ptr_mut_read(ptr, Tracked(&mut points_to_node));
         self.first = node.ptr;
 
@@ -569,7 +578,8 @@ impl LL {
                 1 <= count <= other.len(),
                 other.len() < u32::MAX,
                 other.wf(),
-                p == other.perms@[(other.len() - count) as nat].0.ptr(),
+                p.addr() == other.perms@[(other.len() - count) as nat].0.ptr().addr(),
+                p@.metadata == Metadata::Thin,
             ensures
                 count == other.len(),
                 p == other.perms@[0].0.ptr(),
@@ -583,6 +593,9 @@ impl LL {
                     other.perms.borrow().tracked_borrow(j).0.is_nonnull();
                 }
             }
+
+            p = with_exposed_provenance(p.addr(),
+                Tracked(other.perms.borrow().tracked_borrow((other.len() - count) as nat).3));
 
             let next = *ptr_ref(p, Tracked(&other.perms.borrow().tracked_borrow((other.len() - count) as nat).0));
             if next.ptr.addr() != 0 {
@@ -963,9 +976,9 @@ impl LL {
                             assert(self.perms@.index((j - 1) as nat)
                                 == old(self).perms@.index((j - 1) as nat));
                         }
-                        assert(perm.value().ptr == next_ptr);
+                        assert(perm.value().ptr.addr() == next_ptr.addr());
                     } else {
-                        assert(perm.value().ptr == next_ptr);
+                        assert(perm.value().ptr.addr() == next_ptr.addr());
                     }
 
                     //assert(padding@.size + size_of::<Node>() == block_token@.key.block_size);

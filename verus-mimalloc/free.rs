@@ -281,6 +281,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
         old(local).wf(),
         dealloc.wf(),
         perm.is_range(ptr as int, dealloc.block_id().block_size as int),
+        perm.provenance() == ptr@.provenance,
         ptr == dealloc.ptr,
         old(local).instance == dealloc.mim_instance,
         page.page_id@ == dealloc.block_id().page_id,
@@ -309,6 +310,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
             perm.is_range(ptr as int, dealloc.block_id().block_size as int),
             perm.provenance() == ptr@.provenance,
             ptr as *mut u8 == dealloc.ptr,
+            ptr@.metadata == Metadata::Thin,
             is_page_ptr(page.page_ptr, dealloc.block_id().page_id),
             local.wf(),
             common_preserves(*old(local), *local),
@@ -356,12 +358,15 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
                 ptr,
                 Tracked(perm),
                 masked_ptr_delay_get_ptr(mask, Ghost(delay), Ghost(next_ptr)));
+            assert(ptr_mem0@.ptr() == ptr);
 
             proof {
                 perm = PointsToRaw::empty(ptr@.provenance);
                 ptr_mem = Some(ptr_mem0.get());
                 raw_mem = Some(raw_mem0.get());
             }
+
+            assert(ptr_mem.unwrap().ptr() == ptr);
 
             // mask1 = mask (set next_ptr to ptr)
             mask1 = masked_ptr_delay_set_ptr(mask, ptr, Ghost(delay), Ghost(next_ptr));
@@ -397,6 +402,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
             } else {
                 if ok {
                     let tracked mim_block = mim_block_opt.tracked_unwrap();
+                    assert(ptr_mem.unwrap().ptr() == ptr);
                     ghost_ll.ghost_insert_block(ptr, ptr_mem.tracked_unwrap(),
                         raw_mem.tracked_unwrap(), mim_block);
 

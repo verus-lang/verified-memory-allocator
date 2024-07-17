@@ -343,6 +343,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
         
         let tracked mut ptr_mem = None;
         let tracked mut raw_mem = None;
+        let tracked mut exposed = None;
 
         if unlikely(use_delayed) {
             mask1 = masked_ptr_delay_set_freeing(mask, Ghost(delay), Ghost(next_ptr));
@@ -360,10 +361,13 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
                 masked_ptr_delay_get_ptr(mask, Ghost(delay), Ghost(next_ptr)));
             assert(ptr_mem0@.ptr() == ptr);
 
+            let Tracked(exposed0) = expose_provenance(ptr);
+
             proof {
                 perm = PointsToRaw::empty(ptr@.provenance);
                 ptr_mem = Some(ptr_mem0.get());
                 raw_mem = Some(raw_mem0.get());
+                exposed = Some(exposed0);
             }
 
             assert(ptr_mem.unwrap().ptr() == ptr);
@@ -373,7 +377,6 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
         }
 
         assert(pag.xthread_free.instance == mim_instance);
-        let Tracked(exposed) = expose_provenance(mask1);
 
         let cas_result = atomic_with_ghost!(
             &pag.xthread_free.atomic => compare_exchange_weak(mask, mask1);
@@ -405,7 +408,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
                     let tracked mim_block = mim_block_opt.tracked_unwrap();
                     assert(ptr_mem.unwrap().ptr() == ptr);
                     ghost_ll.ghost_insert_block(ptr, ptr_mem.tracked_unwrap(),
-                        raw_mem.tracked_unwrap(), mim_block, exposed);
+                        raw_mem.tracked_unwrap(), mim_block, exposed.tracked_unwrap());
 
                     mim_block_opt = None;
 

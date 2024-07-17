@@ -798,6 +798,7 @@ impl LL {
                          start.addr() + k * bsize + size_of::<Node>(),
                          bsize - size_of::<Node>())
                       &&& new_map[j].1.provenance() == start@.provenance
+                      &&& new_map[j].3.provenance() == start@.provenance
                 }})
         {
             proof {
@@ -1753,7 +1754,6 @@ struct_with_invariants!{
                     // The usize value stores the pointer and the delay state
 
                     && v as int == ll.ptr() as int + delay_token@.value.to_int()
-                    && (ll.ptr() as int != 0 ==> v@.provenance == ll.ptr()@.provenance)
                     && v@.metadata == ll.ptr()@.metadata
                     && v@.metadata == Metadata::Thin
 
@@ -2143,8 +2143,8 @@ pub fn masked_ptr_delay_get_ptr(v: *mut Node,
     Ghost(expected_delay): Ghost<DelayState>,
     Ghost(expected_ptr): Ghost<*mut Node>) -> (ptr: *mut Node)
   requires v as int == expected_ptr as int + expected_delay.to_int(),
-      expected_ptr as int % 4 == 0,
-  ensures ptr == expected_ptr
+      expected_ptr as int % 4 == 0, v@.metadata == Metadata::Thin,
+  ensures ptr.addr() == expected_ptr.addr(), ptr@.metadata == Metadata::Thin,
 {
     proof {
         let v = v.addr();
@@ -2160,7 +2160,7 @@ pub fn masked_ptr_delay_set_ptr(v: *mut Node, new_ptr: *mut Node,
   requires v as int == expected_ptr as int + expected_delay.to_int(),
       expected_ptr as int % 4 == 0,
       new_ptr as int % 4 == 0,
-  ensures v2 as int == new_ptr as int + expected_delay.to_int()
+  ensures v2 as int == new_ptr as int + expected_delay.to_int(), v2@.provenance == v@.provenance,
 {
     proof {
         let v = v as usize;
@@ -2177,7 +2177,7 @@ pub fn masked_ptr_delay_set_freeing(v: *mut Node,
     Ghost(expected_ptr): Ghost<*mut Node>) -> (v2: *mut Node)
   requires v as int == expected_ptr as int + expected_delay.to_int(),
       expected_ptr as int % 4 == 0,
-  ensures v2 as int == expected_ptr as int + DelayState::Freeing.to_int()
+  ensures v2 as int == expected_ptr as int + DelayState::Freeing.to_int(), v2@.provenance == v@.provenance
 {
     proof {
         let v = v as usize;

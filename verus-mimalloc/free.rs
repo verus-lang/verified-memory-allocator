@@ -58,6 +58,7 @@ pub fn free(ptr: *mut u8, Tracked(user_perm): Tracked<PointsToRaw>, Tracked(user
         ptr.addr() != 0 ==> user_dealloc.is_some(),
         ptr.addr() != 0 ==> user_dealloc.unwrap().wf(),
         ptr.addr() != 0 ==> user_perm.is_range(ptr as int, user_dealloc.unwrap().size()),
+        ptr.addr() != 0 ==> user_perm.provenance() == ptr@.provenance,
         ptr.addr() != 0 ==> ptr == user_dealloc.unwrap().ptr(),
         ptr.addr() != 0 ==> old(local).inst() == user_dealloc.unwrap().inst()
     ensures
@@ -207,6 +208,7 @@ fn free_generic(segment: *mut SegmentHeader, page: PagePtr, is_local: bool, p: *
         old(local).wf(),
         dealloc.wf(),
         perm.is_range(p as int, dealloc.block_id().block_size as int),
+        perm.provenance() == p@.provenance,
         p == dealloc.ptr,
         old(local).instance == dealloc.mim_instance,
         page.wf(),
@@ -231,6 +233,7 @@ fn free_block(page: PagePtr, is_local: bool, ptr: *mut u8, Tracked(perm): Tracke
         old(local).wf(),
         dealloc.wf(),
         perm.is_range(ptr as int, dealloc.block_id().block_size as int),
+        perm.provenance() == ptr@.provenance,
         ptr == dealloc.ptr,
         old(local).instance == dealloc.mim_instance,
         page.wf(),
@@ -359,7 +362,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
                 ptr,
                 Tracked(perm),
                 masked_ptr_delay_get_ptr(mask, Ghost(delay), Ghost(next_ptr)));
-            assert(ptr_mem0@.ptr() == ptr);
+            //assert(ptr_mem0@.ptr() == ptr);
 
             let Tracked(exposed0) = expose_provenance(ptr);
 
@@ -427,15 +430,17 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
 
             g = (emp_token, Some((delay_token, ghost_ll)));
 
-            assert(ghost_ll.wf());
-            assert(ghost_ll.block_size() == pag.xthread_free.block_size());
-            assert(ghost_ll.instance() == pag.xthread_free.instance@);
-            assert(ghost_ll.page_id() == pag.xthread_free.page_id());
-            assert(ghost_ll.fixed_page());
-            assert(delay_token@.instance == pag.xthread_free.instance@);
-            assert(delay_token@.key == pag.xthread_free.page_id());
-            assert(v_new as int == ghost_ll.ptr() as int + delay_token@.value.to_int());
-            assert(ghost_ll.ptr() as int % 4 == 0);
+            //assert(ghost_ll.wf());
+            //assert(ghost_ll.block_size() == pag.xthread_free.block_size());
+            //assert(ghost_ll.instance() == pag.xthread_free.instance@);
+            //assert(ghost_ll.page_id() == pag.xthread_free.page_id());
+            //assert(ghost_ll.fixed_page());
+            //assert(delay_token@.instance == pag.xthread_free.instance@);
+            //assert(delay_token@.key == pag.xthread_free.page_id());
+            //assert(v_new as int == ghost_ll.ptr() as int + delay_token@.value.to_int());
+            //assert(v_new@.metadata == Metadata::Thin);
+            //assert(v_new@.metadata == ghost_ll.ptr()@.metadata);
+            //assert(ghost_ll.ptr() as int % 4 == 0);
         });
 
         match cas_result {
@@ -457,10 +462,10 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
                         ghost g =>
                     {
                         delay_actor_token = delay_actor_token_opt.tracked_unwrap();
-                        assert(!pag.xheap.is_empty());
-                        assert(pag.xheap.wf(pag.xheap.instance@, pag.xheap.page_id@));
+                        //assert(!pag.xheap.is_empty());
+                        //assert(pag.xheap.wf(pag.xheap.instance@, pag.xheap.page_id@));
                         pag.xheap.emp_inst.borrow().agree(pag.xheap.emp.borrow(), &g.0);
-                        assert(g.0@.value == false);
+                        //assert(g.0@.value == false);
                         let tracked (Tracked(tok), _) = mim_instance.delay_lookup_heap(
                             dealloc.block_id(),
                             &local.my_inst,
@@ -535,6 +540,7 @@ pub fn free_delayed_block(ptr: *mut u8,
     requires old(local).wf(),
         dealloc.wf(),
         perm.is_range(ptr as int, dealloc.block_id().block_size as int),
+        perm.provenance() == ptr@.provenance,
         ptr == dealloc.ptr,
         old(local).instance == dealloc.mim_instance,
         dealloc.mim_block@.value.heap_id == Some(old(local).thread_token@.value.heap_id),

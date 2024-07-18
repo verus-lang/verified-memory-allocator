@@ -18,6 +18,7 @@ verus!{
 
 pub ghost struct HeapId {
     pub id: nat,
+    pub provenance: Provenance,
     pub uniq: int,
 }
 
@@ -630,12 +631,12 @@ tokenized_state_machine!{ Mim {
     transition!{
         reserve_uniq_identifier() {
             birds_eye let u = heap_get_unused_uniq_field(pre.heap_shared_access.dom() + pre.reserved_uniq);
-            add reserved_uniq += set { HeapId { id: 0, uniq: u } }
+            add reserved_uniq += set { HeapId { id: 0, uniq: u, provenance: Provenance::null() } }
             by {
                 lemma_heap_get_unused_uniq_field(pre.heap_shared_access.dom() + pre.reserved_uniq);
-                if pre.reserved_uniq.contains(HeapId { id: 0, uniq: u }) {
+                if pre.reserved_uniq.contains(HeapId { id: 0, uniq: u, provenance: Provenance::null() }) {
                     assert((pre.heap_shared_access.dom() + pre.reserved_uniq)
-                        .contains(HeapId { id: 0, uniq: u }));
+                        .contains(HeapId { id: 0, uniq: u, provenance: Provenance::null() }));
                 }
             };
         }
@@ -647,7 +648,7 @@ tokenized_state_machine!{ Mim {
             thread_state: ThreadState,
         ) {
             remove right_to_use_thread -= set { thread_id };
-            remove reserved_uniq -= set { HeapId { id: 0, uniq: thread_state.heap_id.uniq } };
+            remove reserved_uniq -= set { HeapId { id: 0, uniq: thread_state.heap_id.uniq, provenance: Provenance::null() } };
             require thread_state.pages.dom() =~= Set::empty();
             require thread_state.segments.dom() =~= Set::empty();
             have my_inst >= Some(let inst);

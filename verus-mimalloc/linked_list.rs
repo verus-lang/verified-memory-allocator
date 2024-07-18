@@ -2159,8 +2159,8 @@ pub fn masked_ptr_delay_set_ptr(v: *mut Node, new_ptr: *mut Node,
     Ghost(expected_ptr): Ghost<*mut Node>) -> (v2: *mut Node)
   requires v as int == expected_ptr as int + expected_delay.to_int(),
       expected_ptr as int % 4 == 0,
-      new_ptr as int % 4 == 0,
-  ensures v2 as int == new_ptr as int + expected_delay.to_int(), v2@.provenance == v@.provenance,
+      new_ptr as int % 4 == 0, v@.metadata == Metadata::Thin,
+  ensures v2 as int == new_ptr as int + expected_delay.to_int(), v2@.provenance == v@.provenance, v2@.metadata == Metadata::Thin,
 {
     proof {
         let v = v as usize;
@@ -2176,8 +2176,8 @@ pub fn masked_ptr_delay_set_freeing(v: *mut Node,
     Ghost(expected_delay): Ghost<DelayState>,
     Ghost(expected_ptr): Ghost<*mut Node>) -> (v2: *mut Node)
   requires v as int == expected_ptr as int + expected_delay.to_int(),
-      expected_ptr as int % 4 == 0,
-  ensures v2 as int == expected_ptr as int + DelayState::Freeing.to_int(), v2@.provenance == v@.provenance
+      expected_ptr as int % 4 == 0, v@.metadata == Metadata::Thin,
+  ensures v2 as int == expected_ptr as int + DelayState::Freeing.to_int(), v2@.provenance == v@.provenance, v2@.metadata == Metadata::Thin,
 {
     proof {
         let v = v as usize;

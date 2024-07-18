@@ -7,7 +7,7 @@ use vstd::raw_ptr::*;
 use vstd::*;
 use vstd::layout::*;
 
-use crate::types::{SegmentHeader, Page, PagePtr, SegmentPtr, todo};
+use crate::types::{SegmentHeader, Page, PagePtr, SegmentPtr, todo, Heap};
 use crate::tokens::{PageId, SegmentId, BlockId, HeapId, TldId};
 use crate::config::*;
 
@@ -30,8 +30,9 @@ pub open spec fn is_segment_ptr(ptr: *mut SegmentHeader, segment_id: SegmentId) 
       && ptr@.metadata == Metadata::Thin
 }
 
-pub open spec fn is_heap_ptr(ptr: int, heap_id: HeapId) -> bool {
-    heap_id.id == ptr
+pub open spec fn is_heap_ptr(ptr: *mut Heap, heap_id: HeapId) -> bool {
+    heap_id.id == ptr.addr()
+      && ptr@.provenance == heap_id.provenance && ptr@.metadata == Metadata::Thin
 }
 
 pub open spec fn is_tld_ptr(ptr: int, tld_id: TldId) -> bool {

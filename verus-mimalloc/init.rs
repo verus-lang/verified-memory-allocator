@@ -111,7 +111,7 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
     let tld_ptr = addr.with_addr(addr.addr() + SIZEOF_HEAP) as *mut Tld;
 
     let tracked (_, _, Tracked(uniq_reservation_tok)) = global.instance.reserve_uniq_identifier();
-    let heap = HeapPtr { heap_ptr, heap_id: Ghost(HeapId { id: heap_ptr.addr() as nat, uniq: uniq_reservation_tok@.key.uniq }) };
+    let heap = HeapPtr { heap_ptr, heap_id: Ghost(HeapId { id: heap_ptr.addr() as nat, provenance: heap_ptr@.provenance, uniq: uniq_reservation_tok@.key.uniq }) };
     let tld = TldPtr { tld_ptr, tld_id: Ghost(TldId { id: tld_ptr.addr() as nat }) };
 
     let page_empty_stuff = init_empty_page_ptr();
@@ -649,11 +649,12 @@ fn span_queue_headers_tmp() -> [SpanQueueHeader; 32] {
 
 fn thread_data_alloc()
     -> (res: (*mut u8, Tracked<MemChunk>))
-    ensures ({ let (addr, mc) = res; let addr = addr.addr(); {
-        addr != 0 ==> (
-            mc@.pointsto_has_range(addr as int, SIZEOF_HEAP + SIZEOF_TLD)
-            && addr as int + page_size() <= usize::MAX
-            && addr as int % 4096 == 0
+    ensures ({ let (p, mc) = res; {
+        p.addr() != 0 ==> (
+            mc@.pointsto_has_range(p as int, SIZEOF_HEAP + SIZEOF_TLD)
+            && p as int + page_size() <= usize::MAX
+            && p as int % 4096 == 0
+            && p@.provenance == mc@.points_to.provenance()
         )
     }})
 {

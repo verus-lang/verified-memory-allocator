@@ -36,6 +36,7 @@ pub fn malloc_generic(
 
             dealloc@.wf()
               && points_to_raw@.is_range(ptr as int, size as int)
+              && points_to_raw@.provenance() == ptr@.provenance
               && ptr == dealloc@.ptr()
               && dealloc@.inst() == local.instance
               && dealloc@.size() == size

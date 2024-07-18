@@ -37,10 +37,12 @@ impl MemChunk {
         len: int
     ) -> (tracked t: Self)
         ensures
-            t.points_to.dom() == set_int_range(start, start + len),
+            t.points_to.dom() == old(self).points_to.dom().intersect(set_int_range(start, start + len)),
             t.os == old(self).os.restrict(set_int_range(start, start + len)),
             self.points_to.dom() == old(self).points_to.dom().difference(set_int_range(start, start + len)),
             self.os == old(self).os.remove_keys(set_int_range(start, start + len)),
+            self.points_to.provenance() == old(self).points_to.provenance(),
+            self.points_to.provenance() == t.points_to.provenance(),
     {
         let tracked split_os = self.os.tracked_remove_keys(
             set_int_range(start, start + len).intersect(self.os.dom())
@@ -55,7 +57,7 @@ impl MemChunk {
 
         assert(self.points_to.dom() =~= old(self).points_to.dom().difference(set_int_range(start, start + len)));
         assert(self.os =~= old(self).os.remove_keys(set_int_range(start, start + len)));
-        assert(t.points_to.dom() =~= set_int_range(start, start + len));
+        assert(t.points_to.dom() =~= old(self).points_to.dom().intersect(set_int_range(start, start + len)));
         assert(t.os =~= old(self).os.restrict(set_int_range(start, start + len)));
 
         t
@@ -65,9 +67,12 @@ impl MemChunk {
         tracked &mut self,
         tracked t: Self,
     )
+        requires
+            old(self).points_to.provenance() == t.points_to.provenance(),
         ensures
             self.points_to.dom() == old(self).points_to.dom().union(t.points_to.dom()),
             self.os == old(self).os.union_prefer_right(t.os),
+            self.points_to.provenance() == old(self).points_to.provenance(),
     {
         let tracked MemChunk { os, points_to } = t;
         self.os.tracked_union_prefer_right(os);
@@ -101,6 +106,8 @@ impl MemChunk {
             self.os == old(self).os,
             self.points_to.dom() == old(self).points_to.dom().difference(s),
             points_to.dom() == s,
+            self.points_to.provenance() == old(self).points_to.provenance(),
+            points_to.provenance() == old(self).points_to.provenance(),
     {
         let tracked mut pt = PointsToRaw::empty(self.points_to.provenance());
         tracked_swap(&mut pt, &mut self.points_to);
@@ -139,10 +146,12 @@ impl MemChunk {
     )
         requires 
             old(self).wf(),
+            old(self).points_to.provenance() == points_to.provenance()
         ensures
             self.wf(),
             self.os == old(self).os,
             self.points_to.dom() == old(self).points_to.dom() + points_to.dom(),
+            self.points_to.provenance() == points_to.provenance(),
     {
         let tracked mut pt = PointsToRaw::empty(self.points_to.provenance());
         tracked_swap(&mut pt, &mut self.points_to);

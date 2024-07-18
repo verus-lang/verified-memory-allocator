@@ -42,6 +42,7 @@ pub fn heap_malloc(heap: HeapPtr, size: usize, Tracked(local): Tracked<&mut Loca
 
             dealloc@.wf() // $line_count$Trusted$
               && points_to_raw@.is_range(ptr as int, size as int)  // $line_count$Trusted$
+              && points_to_raw@.provenance() == ptr@.provenance  // $line_count$Trusted$
               && ptr == dealloc@.ptr()  // $line_count$Trusted$
               && dealloc@.inst() == local.inst()  // $line_count$Trusted$
               && dealloc@.size() == size  // $line_count$Trusted$
@@ -63,6 +64,7 @@ pub fn heap_malloc_zero(heap: HeapPtr, size: usize, zero: bool, Tracked(local): 
             let (ptr, points_to_raw, dealloc) = t;
             dealloc@.wf()
               && points_to_raw@.is_range(ptr as int, size as int)
+              && points_to_raw@.provenance() == ptr@.provenance
               && ptr == dealloc@.ptr()
               && dealloc@.inst() == local.inst()
               && dealloc@.size() == size
@@ -85,6 +87,7 @@ pub fn heap_malloc_zero_ex(heap: HeapPtr, size: usize, zero: bool, huge_alignmen
             let (ptr, points_to_raw, dealloc) = t;
             dealloc@.wf()
               && points_to_raw@.is_range(ptr as int, size as int)
+              && points_to_raw@.provenance() == ptr@.provenance
               && ptr == dealloc@.ptr()
               && dealloc@.inst() == local.instance
               && dealloc@.size() == size
@@ -145,6 +148,7 @@ pub fn heap_malloc_small_zero(
             let (ptr, points_to_raw, dealloc) = t;
             dealloc@.wf()
               && points_to_raw@.is_range(ptr as int, size as int)
+              && points_to_raw@.provenance() == ptr@.provenance
               && ptr == dealloc@.ptr()
               && dealloc@.inst() == local.instance
               && dealloc@.size() == size
@@ -199,6 +203,7 @@ pub fn page_malloc(
 
             dealloc@.wf()
               && points_to_raw@.is_range(ptr as int, size as int)
+              && points_to_raw@.provenance() == ptr@.provenance
               && ptr == dealloc@.ptr()
               && dealloc@.inst() == local.instance
               && dealloc@.size() == size

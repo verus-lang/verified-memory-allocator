@@ -154,7 +154,7 @@ struct_with_invariants!{
                     &&& !is_emp@.value
                     &&& g@.instance == instance
                     &&& g@.key == page_id
-                    &&& is_heap_ptr(v as int, g@.value)
+                    &&& is_heap_ptr(v, g@.value)
                 }
             })
         }
@@ -530,7 +530,7 @@ impl Heap {
 
 impl HeapSharedAccess {
     pub open spec fn wf(&self, heap_id: HeapId, tld_id: TldId, mim_instance: Mim::Instance) -> bool {
-        is_heap_ptr(self.points_to.ptr() as int, heap_id)
+        is_heap_ptr(self.points_to.ptr(), heap_id)
           && self.points_to.is_init()
           && self.points_to.value().wf(heap_id, tld_id, mim_instance)
     }
@@ -1027,7 +1027,7 @@ impl Copy for HeapPtr { }
 impl HeapPtr {
     #[verifier(inline)]
     pub open spec fn wf(&self) -> bool {
-        is_heap_ptr(self.heap_ptr as int, self.heap_id@)
+        is_heap_ptr(self.heap_ptr, self.heap_id@)
     }
 
     #[verifier(inline)]

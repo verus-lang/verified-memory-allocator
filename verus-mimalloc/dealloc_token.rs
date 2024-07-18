@@ -80,6 +80,7 @@ impl MimDeallocInner {
             let (md, points_to_raw) = res;
             md.wf()
             && points_to_raw.is_range(self.ptr as int, sz)
+            && points_to_raw.provenance() == self.ptr@.provenance
             && md._size == sz
             && md.block_id() == self.block_id()
             && md.ptr() == self.ptr
@@ -131,6 +132,7 @@ impl MimDealloc {
             let (md, points_to_raw_full) = res;
             md.wf()
             && points_to_raw_full.is_range(self.ptr() as int, self.block_id().block_size as int)
+            && points_to_raw_full.provenance() == points_to_raw.provenance()
             && self.ptr() == md.ptr
             && self.block_id().block_size == md.mim_block@.key.block_size
             && md.mim_instance == self.inst()

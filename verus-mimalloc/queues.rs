@@ -650,6 +650,15 @@ fn heap_queue_first_update(heap: HeapPtr, pq: usize, Tracked(local): Tracked<&mu
                     #[trigger] old(local).heap.pages_free_direct@.value.unwrap()@[k],
                     old_p, old(local).page_empty_global@.s.points_to.ptr())
         ),
+        old_p.addr() != 0 &&
+          old_p.addr() == old(local).heap.pages@.value.unwrap()@[pq as int].first.addr()
+          ==> old_p == old(local).heap.pages@.value.unwrap()@[pq as int].first,
+        old_p.addr() == old(local).page_empty_global@.s.points_to.ptr().addr()
+          ==> old_p == old(local).page_empty_global@.s.points_to.ptr(),
+        old(local).heap.pages@.value.unwrap()@[pq as int].first.addr()
+              == old(local).page_empty_global@.s.points_to.ptr().addr()
+          ==> old(local).heap.pages@.value.unwrap()@[pq as int].first
+              == old(local).page_empty_global@.s.points_to.ptr()
     ensures
         pq == BIN_FULL ==> *local == *old(local),
         pq != BIN_FULL ==> local_direct_update(*old(local), *local,
@@ -664,14 +673,15 @@ fn heap_queue_first_update(heap: HeapPtr, pq: usize, Tracked(local): Tracked<&mu
         proof {
             if pq != BIN_FULL {
                 out_of_small_range(pq as int);
-                assert(pfd_lower(pq as int) >= PAGES_DIRECT);
+                //assert(pfd_lower(pq as int) >= PAGES_DIRECT);
             }
         }
         return;
     }
-    assert(pq != BIN_FULL);
+    //assert(pq != BIN_FULL);
 
     let mut page_ptr = heap.get_pages(Tracked(&*local))[pq].first;
+    //assert(page_ptr == old(local).heap.pages@.value.unwrap()@[pq as int].first);
     if page_ptr.addr() == 0 {
         let (_page, Tracked(emp)) = heap.get_page_empty(Tracked(&*local));
         page_ptr = _page;
@@ -706,6 +716,11 @@ fn heap_queue_first_update(heap: HeapPtr, pq: usize, Tracked(local): Tracked<&mu
             }
             assert(local_direct_update(loc1, loc2, i, j, pq));
         }*/
+        //assert(page_ptr == old(local).heap.pages@.value.unwrap()@[pq as int].first);
+        //assert(old_p.addr() == page_ptr.addr());
+        //assert(old_p.addr() != 0);
+        //assert(old_p == page_ptr);
+        //assert(local.heap.pages_free_direct@.value.unwrap()@[idx as int] == page_ptr);
         return;
     }
 

@@ -28,9 +28,8 @@ pub fn os_commit(addr: *mut u8, size: usize, Tracked(mem): Tracked<&mut MemChunk
         //&& (success ==> mem.os_has_range_read_write(addr as int, size as int))
         && mem.has_new_pointsto(&*old(mem))
         && mem.os.dom() == old(mem).os.dom()
-
-        && (success ==>
-            mem.os_has_range_read_write(addr as int, size as int))
+        && mem.points_to.provenance() == old(mem).points_to.provenance()
+        && (success ==> mem.os_has_range_read_write(addr as int, size as int))
     })
 {
     os_commitx(addr, size, true, false, Tracked(&mut *mem))
@@ -52,6 +51,7 @@ pub fn os_decommit(addr: *mut u8, size: usize, Tracked(mem): Tracked<&mut MemChu
 
         mem.points_to.dom().subset_of(old(mem).points_to.dom()),
         mem.os_rw_bytes().subset_of(old(mem).os_rw_bytes()),
+        mem.points_to.provenance() == old(mem).points_to.provenance(),
 
         old(mem).points_to.dom() - mem.points_to.dom()
             =~= old(mem).os_rw_bytes() - mem.os_rw_bytes(),

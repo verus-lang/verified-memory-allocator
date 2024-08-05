@@ -33,13 +33,13 @@ fn segment_commit_mask(
         p >= segment_ptr as int,
         p + size <= segment_ptr as int + SEGMENT_SIZE,
         old(cm)@ == Set::<int>::empty(),
-    ensures ({ let (start_p, full_size) = res; let start_p = start_p.addr(); {
+    ensures ({ let (start_p, full_size) = res; {
         (cm@ == Set::<int>::empty() ==> !conservative ==> size == 0)
         && (cm@ != Set::<int>::empty() ==>
-            (conservative ==> p <= start_p <= start_p + full_size <= p + size)
-            && (!conservative ==> start_p <= p <= p + size <= start_p + full_size)
-            && start_p >= segment_ptr as int
-            && start_p + full_size <= segment_ptr as int + SEGMENT_SIZE
+            (conservative ==> p <= start_p as int <= start_p as int + full_size <= p + size)
+            && (!conservative ==> start_p as int <= p <= p + size <= start_p as int + full_size)
+            && start_p as int >= segment_ptr as int
+            && start_p as int + full_size <= segment_ptr as int + SEGMENT_SIZE
             //&& (!conservative ==> set_int_range((p - segment_ptr) / COMMIT_SIZE as int,
             //    (((p + size - 1 - segment_ptr as int) / COMMIT_SIZE as int) + 1)).subset_of(cm@))
             //&& (conservative ==> cm@ <= set_int_range((p - segment_ptr) / COMMIT_SIZE as int,
@@ -47,12 +47,13 @@ fn segment_commit_mask(
             && start_p as int % COMMIT_SIZE as int == 0
             && full_size as int % COMMIT_SIZE as int == 0
             && cm@ =~= 
-                set_int_range((start_p - segment_ptr as int) / COMMIT_SIZE as int,
-                    (((start_p + full_size - segment_ptr as int) / COMMIT_SIZE as int)))
+                set_int_range((start_p as int - segment_ptr as int) / COMMIT_SIZE as int,
+                    (((start_p as int + full_size - segment_ptr as int) / COMMIT_SIZE as int)))
+            && start_p@.provenance == segment_ptr@.provenance
         )
         && (!conservative ==> forall |i| #[trigger] cm@.contains(i) ==>
-            start_p <= segment_ptr as int + i * SLICE_SIZE
-            && start_p + full_size >= segment_ptr as int + (i + 1) * SLICE_SIZE
+            start_p as int <= segment_ptr as int + i * SLICE_SIZE
+            && start_p as int + full_size >= segment_ptr as int + (i + 1) * SLICE_SIZE
         )
         //&& start_p as int % SLICE_SIZE as int == 0
         //&& full_size as int % SLICE_SIZE as int == 0

@@ -177,6 +177,7 @@ pub open spec fn mem_chunk_good1(
 ) -> bool {
     &&& mem.wf()
     &&& mem.os_exact_range(segment_start(segment_id), SEGMENT_SIZE as int)
+    &&& mem.points_to.provenance() == segment_id.provenance
 
     &&& commit_bytes.subset_of(mem.os_rw_bytes())
 
@@ -512,6 +513,7 @@ pub proof fn preserves_mem_chunk_good_on_commit(local1: Local, local2: Local, si
         local2.decommit_mask(sid).bytes(sid) == local1.decommit_mask(sid).bytes(sid),
         local2.segments[sid].mem.wf(),
         local2.segments[sid].mem.has_new_pointsto(&local1.segments[sid].mem),
+        local2.segments[sid].mem.points_to.provenance() == local1.segments[sid].mem.points_to.provenance(),
     ensures local2.mem_chunk_good(sid),
 {
     preserves_mem_chunk_good_on_commit_with_mask_set(local1, local2, sid);
@@ -525,6 +527,7 @@ pub proof fn preserves_mem_chunk_good_on_decommit(local1: Local, local2: Local, 
         local2.page_organization == local1.page_organization,
         local2.pages == local1.pages,
         local2.segments[sid].mem.wf(),
+        local2.segments[sid].mem.points_to.provenance() == local1.segments[sid].mem.points_to.provenance(),
 
         local2.decommit_mask(sid).bytes(sid) <= local1.decommit_mask(sid).bytes(sid),
         local2.commit_mask(sid).bytes(sid) =~=
@@ -564,6 +567,7 @@ pub proof fn preserves_mem_chunk_good_on_commit_with_mask_set(local1: Local, loc
         local2.pages == local1.pages,
         local2.segments[sid].mem.wf(),
         local2.segments[sid].mem.has_new_pointsto(&local1.segments[sid].mem),
+        local2.segments[sid].mem.points_to.provenance() == sid.provenance,
 
         local2.decommit_mask(sid).bytes(sid).subset_of( local1.decommit_mask(sid).bytes(sid) ),
         local1.commit_mask(sid).bytes(sid).subset_of( local2.commit_mask(sid).bytes(sid) ),
@@ -616,6 +620,7 @@ pub proof fn preserves_mem_chunk_good_on_transfer_to_capacity(local1: Local, loc
         local2.commit_mask(page_id.segment_id).bytes(page_id.segment_id) == local1.commit_mask(page_id.segment_id).bytes(page_id.segment_id),
         local2.decommit_mask(page_id.segment_id).bytes(page_id.segment_id) == local1.decommit_mask(page_id.segment_id).bytes(page_id.segment_id),
         local2.segments[page_id.segment_id].mem.wf(),
+        local2.segments[page_id.segment_id].mem.points_to.provenance() == page_id.segment_id.provenance,
 
         local1.is_used_primary(page_id),
         forall |page_id| #[trigger] local1.is_used_primary(page_id) ==>
@@ -720,6 +725,7 @@ pub proof fn preserves_mem_chunk_good_on_transfer_back(local1: Local, local2: Lo
         local2.commit_mask(page_id.segment_id).bytes(page_id.segment_id) == local1.commit_mask(page_id.segment_id).bytes(page_id.segment_id),
         local2.decommit_mask(page_id.segment_id).bytes(page_id.segment_id) == local1.decommit_mask(page_id.segment_id).bytes(page_id.segment_id),
         local2.segments[page_id.segment_id].mem.wf(),
+        local2.segments[page_id.segment_id].mem.points_to.provenance() == page_id.segment_id.provenance,
 
         local1.is_used_primary(page_id),
         forall |pid| #[trigger] local1.is_used_primary(pid) && pid != page_id ==>

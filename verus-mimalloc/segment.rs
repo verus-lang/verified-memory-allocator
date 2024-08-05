@@ -1043,6 +1043,8 @@ fn segment_alloc(
     });
     let (cur_thread_id, Tracked(is_thread)) = crate::thread::thread_id();
     proof { local.is_thread.agrees(is_thread); }
+    //assert(segment_ptr.segment_ptr@.metadata == seg_header_points_to.ptr()@.metadata);
+    //assert(segment_ptr.segment_ptr@.provenance == seg_header_points_to.ptr()@.provenance);
     ptr_mut_write(segment_ptr.segment_ptr, Tracked(&mut seg_header_points_to), SegmentHeader {
         main: pcell_main,
         abandoned_next: 0,
@@ -1065,6 +1067,8 @@ fn segment_alloc(
     let ghost old_mem_chunk = mem_chunk;
     let tracked mut psa_map = Map::<PageId, PageSharedAccess>::tracked_empty();
     let tracked mut pla_map = Map::<PageId, PageLocalAccess>::tracked_empty();
+    //assert(segment_ptr.segment_ptr@.metadata == Metadata::Thin);
+    //assert(segment_ptr.segment_ptr@.provenance == segment_ptr.segment_id@.provenance);
     while i <= SLICES_PER_SEGMENT as usize
         invariant mem_chunk.os == old_mem_chunk.os,
             mem_chunk.wf(),
@@ -1080,6 +1084,9 @@ fn segment_alloc(
                 ),
 
             cur_page_ptr as int == segment_start(segment_id) + SIZEOF_SEGMENT_HEADER + i * SIZEOF_PAGE_HEADER,
+            cur_page_ptr@.metadata == Metadata::Thin,
+            cur_page_ptr@.provenance == segment_ptr.segment_ptr@.provenance,
+            mem_chunk.points_to.provenance() == segment_ptr.segment_ptr@.provenance,
             segment_ptr.segment_ptr as int + SEGMENT_SIZE < usize::MAX,
             segment_ptr.wf(),
             segment_ptr.segment_id@ == segment_id,
@@ -1376,6 +1383,9 @@ fn segment_os_alloc(
             &&& segment_ptr.wf()
             &&& mem_chunk@.wf()
             &&& mem_chunk@.os_exact_range(segment_ptr.segment_ptr as int, SEGMENT_SIZE as int)
+            &&& mem_chunk@.points_to.provenance() == segment_ptr.segment_ptr@.provenance
+            &&& segment_ptr.segment_ptr@.metadata == Metadata::Thin
+            &&& segment_ptr.segment_ptr@.provenance == segment_ptr.segment_id@.provenance
             &&& set_int_range(segment_start(segment_ptr.segment_id@),
                     segment_start(segment_ptr.segment_id@) + COMMIT_SIZE).subset_of( pcommit_mask.bytes(segment_ptr.segment_id@) )
             &&& pcommit_mask.bytes(segment_ptr.segment_id@).subset_of(mem_chunk@.os_rw_bytes())

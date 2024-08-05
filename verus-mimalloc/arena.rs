@@ -32,11 +32,11 @@ pub fn arena_alloc_aligned(
         size == SEGMENT_SIZE,
     ensures ({
         let (addr, mem, commit, large, is_pinned, is_zero, mem_id) = res;
-        let addr = addr as int;
-        addr != 0 ==> (
+        addr as int != 0 ==> (
           mem@.wf()
             && mem@.os_exact_range(addr as int, size as int)
-            && addr + size <= usize::MAX
+            && mem@.points_to.provenance() == addr@.provenance
+            && addr as int + size <= usize::MAX
             && (request_commit ==> commit)
             && (commit ==> mem@.os_has_range_read_write(addr as int, size as int))
             && (commit ==> mem@.pointsto_has_range(addr as int, size as int))

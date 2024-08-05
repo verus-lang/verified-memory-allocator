@@ -692,7 +692,7 @@ tokenized_state_machine!{ Mim {
             birds_eye let real_segment_id = Self::mk_fresh_segment_id(pre.thread_of_segment,pre_segment_id);
             assert !ts.segments.dom().contains(real_segment_id)
               by { lemma_segment_get_unused_uniq_field(pre.thread_of_segment.dom()); };
-            assert pre_segment_id.id == real_segment_id.id;
+            assert pre_segment_id.id == real_segment_id.id && pre_segment_id.provenance == real_segment_id.provenance;
             let new_segments = ts.segments.insert(real_segment_id, segment_state);
             let ts2 = ThreadState { segments: new_segments, .. ts };
             add thread_local_state += [ thread_id => ts2 ];

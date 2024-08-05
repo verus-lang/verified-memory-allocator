@@ -681,7 +681,7 @@ impl Local {
     }
 
     pub open spec fn wf_basic(&self) -> bool {
-        &&& is_tld_ptr(self.tld.ptr() as int, self.tld_id)
+        &&& is_tld_ptr(self.tld.ptr(), self.tld_id)
 
         &&& self.thread_token@.instance == self.instance
         &&& self.thread_token@.key == self.thread_id
@@ -691,12 +691,12 @@ impl Local {
         &&& self.thread_token@.value.heap_id == self.heap_id
         &&& self.heap.wf_basic(self.heap_id, self.thread_token@.value.heap, self.tld_id, self.instance)
 
-        &&& self.thread_token@.value.heap.shared_access.points_to.value().page_empty_ptr.addr() == self.page_empty_global@.s.points_to.ptr() as int
+        &&& self.thread_token@.value.heap.shared_access.points_to.value().page_empty_ptr == self.page_empty_global@.s.points_to.ptr()
         &&& self.page_empty_global@.wf_empty_page_global()
     }
 
     pub open spec fn wf_main(&self) -> bool {
-        &&& is_tld_ptr(self.tld.ptr() as int, self.tld_id)
+        &&& is_tld_ptr(self.tld.ptr(), self.tld_id)
 
         &&& self.thread_token@.instance == self.instance
         &&& self.thread_token@.key == self.thread_id
@@ -1236,7 +1236,7 @@ impl Copy for TldPtr { }
 impl TldPtr {
     #[verifier(inline)]
     pub open spec fn wf(&self) -> bool {
-        is_tld_ptr(self.tld_ptr as int, self.tld_id@)
+        is_tld_ptr(self.tld_ptr, self.tld_id@)
     }
 
     #[verifier(inline)]

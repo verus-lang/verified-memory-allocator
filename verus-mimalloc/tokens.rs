@@ -24,6 +24,7 @@ pub ghost struct HeapId {
 
 pub ghost struct TldId {
     pub id: nat,
+    pub provenance: Provenance,
 }
 
 pub ghost struct SegmentId {
@@ -1087,7 +1088,7 @@ tokenized_state_machine!{ Mim {
 
     #[invariant]
     pub closed spec fn inv_reserved(&self) -> bool {
-        (forall |heap_id: HeapId| self.reserved_uniq.contains(heap_id) ==> heap_id.id == 0)
+        (forall |heap_id: HeapId| self.reserved_uniq.contains(heap_id) ==> heap_id.id == 0 && heap_id.provenance == Provenance::null())
     }
 
     #[invariant]

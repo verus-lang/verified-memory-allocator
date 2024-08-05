@@ -334,7 +334,7 @@ fn page_free_list_extend(
         by {
             let block_id = block_tokens.index(i)@.key;
             let block_size = bsize as int;
-            reveal(is_block_ptr);
+            reveal(is_block_ptr1);
             get_block_start_defn(block_id);
             crate::linked_list::size_of_node();
             start_offset_le_slice_size(block_size);

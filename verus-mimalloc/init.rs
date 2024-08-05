@@ -112,7 +112,7 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
 
     let tracked (_, _, Tracked(uniq_reservation_tok)) = global.instance.reserve_uniq_identifier();
     let heap = HeapPtr { heap_ptr, heap_id: Ghost(HeapId { id: heap_ptr.addr() as nat, provenance: heap_ptr@.provenance, uniq: uniq_reservation_tok@.key.uniq }) };
-    let tld = TldPtr { tld_ptr, tld_id: Ghost(TldId { id: tld_ptr.addr() as nat }) };
+    let tld = TldPtr { tld_ptr, tld_id: Ghost(TldId { id: tld_ptr.addr() as nat, provenance: tld_ptr@.provenance }) };
 
     let page_empty_stuff = init_empty_page_ptr();
     let EmptyPageStuff { ptr: page_empty_ptr, pfa: Tracked(page_empty_ptr_access) } = page_empty_stuff;

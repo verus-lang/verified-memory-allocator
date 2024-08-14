@@ -163,9 +163,9 @@ fn segment_commitx(
     let ghost sid = segment.segment_id@;
     proof {
         segment_id_divis(segment);
+        const_facts();
         local.instance.thread_local_state_guards_segment(
            local.thread_id, segment.segment_id@, &local.thread_token).points_to.is_nonnull();
-        const_facts();
         decommit_subset_of_pointsto(*local, sid);
     }
 

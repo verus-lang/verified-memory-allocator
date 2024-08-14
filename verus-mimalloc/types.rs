@@ -1191,7 +1191,7 @@ impl HeapPtr {
     {
         let page_ptr = self.get_ref(Tracked(local)).page_empty_ptr;
         let tracked pfa = local.page_empty_global.clone();
-        proof { pfa.borrow().s.points_to.is_nonnull(); }
+        proof { const_facts(); pfa.borrow().s.points_to.is_nonnull(); }
         (page_ptr, Tracked(pfa))
     }
 }

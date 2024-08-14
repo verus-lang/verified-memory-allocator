@@ -243,7 +243,8 @@ fn segment_commitx(
         let old_cm = old(local).segments[sid].main@.value.unwrap().commit_mask@;
 
         if commit {
-            reveal(CommitMask::bytes);
+            assert(local.decommit_mask(sid).bytes(sid).subset_of( old(local).decommit_mask(sid).bytes(sid) ) && old(local).commit_mask(sid).bytes(sid).subset_of( local.commit_mask(sid).bytes(sid) )) by { reveal(CommitMask::bytes); }
+            assert((old(local).segments[sid].mem.os_rw_bytes() + (local.commit_mask(sid).bytes(sid) - old(local).commit_mask(sid).bytes(sid))).subset_of(local.segments[sid].mem.os_rw_bytes())) by { reveal(CommitMask::bytes); }
             preserves_mem_chunk_good_on_commit_with_mask_set(*old(local), *local, sid);
             assert(local.mem_chunk_good(sid));
             assert forall |sid1| sid1 != sid && old(local).mem_chunk_good(sid1)
@@ -259,7 +260,9 @@ fn segment_commitx(
                 assert(segment_start(sid) == segment.segment_ptr.addr());
                 let k = (j - segment_start(sid)) / COMMIT_SIZE as int;
                 assert(mask@.contains(k));
+                reveal(CommitMask::bytes);
             }
+            assert(set_int_range(p as int, p + size) <= local.commit_mask(segment.segment_id@).bytes(segment.segment_id@) - local.decommit_mask(segment.segment_id@).bytes(segment.segment_id@)) by { reveal(CommitMask::bytes); };
         } else {
             assert forall |sid1| sid1 != sid && old(local).mem_chunk_good(sid1)
                 implies local.mem_chunk_good(sid1)

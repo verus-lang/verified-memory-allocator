@@ -762,11 +762,10 @@ fn init_empty_page_ptr() -> (e: EmptyPageStuff)
         next: next_pcell,
         padding: 0,
     });
+    let Tracked(exposed) = expose_provenance(page_ptr);
 
     let tracked pfa = Duplicable::new(PageFullAccess {
-        s: PageSharedAccess {
-            points_to,
-        },
+        s: PageSharedAccess { points_to, exposed },
         l: PageLocalAccess {
             count: count_perm,
             inner: inner_perm,

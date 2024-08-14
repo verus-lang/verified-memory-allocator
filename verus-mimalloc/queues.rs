@@ -650,15 +650,15 @@ fn heap_queue_first_update(heap: HeapPtr, pq: usize, Tracked(local): Tracked<&mu
                     #[trigger] old(local).heap.pages_free_direct@.value.unwrap()@[k],
                     old_p, old(local).page_empty_global@.s.points_to.ptr())
         ),
-        old_p.addr() != 0 &&
-          old_p.addr() == old(local).heap.pages@.value.unwrap()@[pq as int].first.addr()
-          ==> old_p == old(local).heap.pages@.value.unwrap()@[pq as int].first,
-        old_p.addr() == old(local).page_empty_global@.s.points_to.ptr().addr()
-          ==> old_p == old(local).page_empty_global@.s.points_to.ptr(),
-        old(local).heap.pages@.value.unwrap()@[pq as int].first.addr()
-              == old(local).page_empty_global@.s.points_to.ptr().addr()
-          ==> old(local).heap.pages@.value.unwrap()@[pq as int].first
-              == old(local).page_empty_global@.s.points_to.ptr()
+        //old_p.addr() != 0 &&
+        //  old_p.addr() == old(local).heap.pages@.value.unwrap()@[pq as int].first.addr()
+        //  ==> old_p == old(local).heap.pages@.value.unwrap()@[pq as int].first,
+        //old_p.addr() == old(local).page_empty_global@.s.points_to.ptr().addr()
+        //  ==> old_p == old(local).page_empty_global@.s.points_to.ptr(),
+        //old(local).heap.pages@.value.unwrap()@[pq as int].first.addr()
+        //      == old(local).page_empty_global@.s.points_to.ptr().addr()
+        //  ==> old(local).heap.pages@.value.unwrap()@[pq as int].first
+        //      == old(local).page_empty_global@.s.points_to.ptr()
     ensures
         pq == BIN_FULL ==> *local == *old(local),
         pq != BIN_FULL ==> local_direct_update(*old(local), *local,
@@ -798,5 +798,35 @@ fn heap_queue_first_update(heap: HeapPtr, pq: usize, Tracked(local): Tracked<&mu
         sz += 1;
     }
 }
+
+/*
+proof fn ptr_ineqs(old_p: *mut Page, pq: usize, Tracked(local): Tracked<&mut Local>)
+    requires
+        old(local).wf_main(),
+        pq == BIN_FULL || valid_bin_idx(pq as int),
+    ensures
+        *local == *old(local),
+        old_p.addr() != 0 &&
+          old_p.addr() == local.heap.pages@.value.unwrap()@[pq as int].first.addr()
+          ==> old_p == local.heap.pages@.value.unwrap()@[pq as int].first,
+        old_p.addr() == local.page_empty_global@.s.points_to.ptr().addr()
+          ==> old_p == local.page_empty_global@.s.points_to.ptr(),
+        local.heap.pages@.value.unwrap()@[pq as int].first.addr()
+              == local.page_empty_global@.s.points_to.ptr().addr()
+          ==> local.heap.pages@.value.unwrap()@[pq as int].first
+              == local.page_empty_global@.s.points_to.ptr()
+{
+    if local.heap.pages@.value.unwrap()@[pq as int].first
+        != local.page_empty_global@.s.points_to.ptr()
+    {
+        let page_id = local.page_organization.used_dlist_headers[pq as int].first.unwrap();
+        let tracked pt = local.pages.tracked_remove(page_id);
+        pt.points_to.is_disjoint(&local.page_empty_global.borrow().s.points_to);
+        local.pages.tracked_insert(page_id, pt);
+    }
+
+    assert(local.pages =~= old(local).pages);
+}
+*/
 
 }

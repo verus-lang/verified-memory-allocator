@@ -118,7 +118,6 @@ pub fn heap_get_free_small_page(heap: HeapPtr, size: usize, Tracked(local): Trac
     let ghost bin_idx = smallest_bin_fitting_size((size + 7) / 8 * 8);
     let ghost page_id = 
         local.page_organization.used_dlist_headers[bin_idx].first.unwrap();
-    let page_ptr = PagePtr { page_ptr: ptr, page_id: Ghost(page_id) };
     proof {
         bounds_for_smallest_bin_fitting_size((size + 7) / 8 * 8);
         //if page_ptr.page_ptr.addr() != local.page_empty_global@.s.points_to.ptr().addr() {
@@ -127,6 +126,9 @@ pub fn heap_get_free_small_page(heap: HeapPtr, size: usize, Tracked(local): Trac
             //assert(local.heap.pages@.value.unwrap()@[bin_idx].first.id() != 0);
         //}
     }
+    let ptr = with_exposed_provenance(ptr.addr(), Tracked(if ptr as int == local.page_empty_global@.s.points_to.ptr() as int { local.page_empty_global.borrow().s.exposed } else { local.instance.thread_local_state_guards_page(local.thread_id, page_id, &local.thread_token).exposed }));
+    let page_ptr = PagePtr { page_ptr: ptr, page_id: Ghost(page_id) };
+
     return page_ptr;
 }
 

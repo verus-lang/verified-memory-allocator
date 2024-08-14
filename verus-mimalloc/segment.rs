@@ -807,7 +807,8 @@ fn segment_span_allocate(
                   local.unused_pages.dom().contains(page_id)
                   && (local.unused_pages.dom().contains(page_id) ==>
                     local.unused_pages[page_id].points_to.is_init()
-                    && is_page_ptr(local.unused_pages[page_id].points_to.ptr(), page_id)),
+                    && is_page_ptr(local.unused_pages[page_id].points_to.ptr(), page_id))
+                    && local.unused_pages[page_id].points_to.ptr()@.provenance == local.unused_pages[page_id].exposed.provenance(),
           forall |page_id|
               #[trigger] local.unused_pages.dom().contains(page_id) ==>
               (
@@ -1121,11 +1122,11 @@ fn segment_alloc(
                     &&& psa_map[page_id].points_to.value().inner.id() == pla_map[page_id].inner@.pcell
                     &&& psa_map[page_id].points_to.value().prev.id() == pla_map[page_id].prev@.pcell
                     &&& psa_map[page_id].points_to.value().next.id() == pla_map[page_id].next@.pcell
+                    &&& psa_map[page_id].points_to.ptr()@.provenance == psa_map[page_id].exposed.provenance()
                     &&& psa_map[page_id].points_to.value().offset == 0
                     &&& psa_map[page_id].points_to.value().xthread_free.is_empty()
                     &&& psa_map[page_id].points_to.value().xthread_free.wf()
-                    &&& psa_map[page_id].points_to.value().xthread_free.instance
-                          == local.instance
+                    &&& psa_map[page_id].points_to.value().xthread_free.instance == local.instance
                     &&& psa_map[page_id].points_to.value().xheap.is_empty()
                 }
             }
@@ -1183,9 +1184,8 @@ fn segment_alloc(
             next: pointsto_next,
         };
         ptr_mut_write(cur_page_ptr, Tracked(&mut page_header_points_to), page);
-        let tracked psa = PageSharedAccess {
-            points_to: page_header_points_to,
-        };
+        let Tracked(exposed) = expose_provenance(cur_page_ptr);
+        let tracked psa = PageSharedAccess { points_to: page_header_points_to, exposed };
         proof {
             psa_map.tracked_insert(page_id, psa);
             pla_map.tracked_insert(page_id, pla);

@@ -217,6 +217,7 @@ pub struct Page {
 
 pub tracked struct PageSharedAccess {
     pub tracked points_to: raw_ptr::PointsTo<Page>,
+    pub tracked exposed: raw_ptr::IsExposed,
 }
 
 pub tracked struct PageLocalAccess {
@@ -274,18 +275,21 @@ impl PageSharedAccess {
         &&& is_page_ptr(self.points_to.ptr(), page_id)
         &&& self.points_to.is_init()
         &&& self.points_to.value().wf(page_id, block_size, mim_instance)
+        &&& self.exposed.provenance() == self.points_to.ptr()@.provenance
     }
 
     pub open spec fn wf_secondary(&self, page_id: PageId, block_size: nat, mim_instance: Mim::Instance) -> bool {
         &&& is_page_ptr(self.points_to.ptr(), page_id)
         &&& self.points_to.is_init()
         &&& self.points_to.value().wf_secondary(mim_instance)
+        &&& self.exposed.provenance() == self.points_to.ptr()@.provenance
     }
 
     pub open spec fn wf_unused(&self, page_id: PageId, mim_instance: Mim::Instance) -> bool {
         &&& is_page_ptr(self.points_to.ptr(), page_id)
         &&& self.points_to.is_init()
         &&& self.points_to.value().wf_unused(mim_instance)
+        &&& self.exposed.provenance() == self.points_to.ptr()@.provenance
     }
 }
 
@@ -356,8 +360,9 @@ impl PageLocalAccess {
 impl PageFullAccess {
     pub open spec fn wf_empty_page_global(&self) -> bool {
         &&& self.s.points_to.is_init()
-        &&& self.s.points_to.value().inner.id()
-              == self.l.inner@.pcell
+        &&& self.s.points_to.value().inner.id() == self.l.inner@.pcell
+        &&& self.s.exposed.provenance() == self.s.points_to.ptr()@.provenance
+        &&& self.s.points_to.ptr()@.metadata == Metadata::Thin
         &&& self.l.inner@.value.is_some()
         &&& self.l.inner@.value.unwrap().zeroed()
     }
@@ -542,8 +547,8 @@ impl HeapSharedAccess {
 }
 
 pub open spec fn pages_free_direct_match(pfd_val: *mut Page, p_val: *mut Page, emp: *mut Page) -> bool {
-    (p_val as int == 0 ==> pfd_val == emp)
-    && (p_val as int != 0 ==> pfd_val == p_val)
+    (p_val as int == 0 ==> pfd_val as int == emp as int)
+    && (p_val as int != 0 ==> pfd_val as int == p_val as int)
 }
 
 pub open spec fn pages_free_direct_is_correct(pfd: Seq<*mut Page>, pages: Seq<PageQueue>, emp: *mut Page) -> bool {
@@ -2053,14 +2058,14 @@ macro_rules! unused_page_get_mut_internal {
             let page_ptr = ($ptr);
 
             let tracked psa = $local.unused_pages.tracked_remove(page_ptr.page_id@);
-            let tracked PageSharedAccess { points_to: mut points_to } = psa;
+            let tracked PageSharedAccess { points_to: mut points_to, exposed } = psa;
             let mut $page = vstd::raw_ptr::ptr_mut_read(page_ptr.page_ptr, Tracked(&mut points_to));
 
             { $body }
 
             vstd::raw_ptr::ptr_mut_write(page_ptr.page_ptr, Tracked(&mut points_to), $page);
             proof {
-                let tracked psa = PageSharedAccess { points_to: points_to };
+                let tracked psa = PageSharedAccess { points_to: points_to, exposed };
                 $local.unused_pages.tracked_insert(page_ptr.page_id@, psa);
             }
         } }

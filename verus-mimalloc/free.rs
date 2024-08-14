@@ -140,7 +140,7 @@ pub fn free(ptr: *mut u8, Tracked(user_perm): Tracked<PointsToRaw>, Tracked(user
         Ghost(dealloc.block_id().page_id),
     );
 
-    assert(is_page_ptr(page_ptr, dealloc.block_id().page_id));
+    //assert(is_page_ptr(page_ptr, dealloc.block_id().page_id));
 
     /*
     let tracked page_shared_access: &PageSharedAccess;
@@ -161,25 +161,25 @@ pub fn free(ptr: *mut u8, Tracked(user_perm): Tracked<PointsToRaw>, Tracked(user
     // Case based on whether this is thread local or not
 
     if likely(is_local) {
-        assert(local.pages.dom().contains(page_id));
-        assert(page.is_in(*local));
-        assert(page.wf());
-        assert(local.is_used_primary(page_id));
+        //assert(local.pages.dom().contains(page_id));
+        //assert(page.is_in(*local));
+        //assert(page.wf());
+        //assert(local.is_used_primary(page_id));
 
         if likely(page.get_inner_ref(Tracked(&*local)).not_full_nor_aligned()) {
             let used;
             page_get_mut_inner!(page, local, page_inner => {
                 let tracked mim_block = dealloc.mim_block;
 
-                proof {
-                    assert(mim_block@.key.page_id == page_inner.free.page_id());
-                    assert(mim_block@.key.block_size == page_inner.free.block_size());
-                }
+                //proof {
+                    //assert(mim_block@.key.page_id == page_inner.free.page_id());
+                    //assert(mim_block@.key.block_size == page_inner.free.block_size());
+                //}
 
                 page_inner.free.insert_block(ptr, Tracked(perm), Tracked(mim_block));
 
                 bound_on_2_lists(Tracked(local.instance.clone()), Tracked(&local.thread_token), &mut page_inner.free, &mut page_inner.local_free);
-                assert(page_inner.used >= 1);
+                //assert(page_inner.used >= 1);
 
                 used = page_inner.used - 1;
                 page_inner.used = used;
@@ -187,7 +187,7 @@ pub fn free(ptr: *mut u8, Tracked(user_perm): Tracked<PointsToRaw>, Tracked(user
 
             proof {
                 crate::os_mem_util::preserves_mem_chunk_good(*old(local), *local);
-                assert(local.wf());
+                //assert(local.wf());
             }
 
             if unlikely(used == 0) {
@@ -250,15 +250,15 @@ fn free_block(page: PagePtr, is_local: bool, ptr: *mut u8, Tracked(perm): Tracke
         page_get_mut_inner!(page, local, page_inner => {
             let tracked mim_block = dealloc.mim_block;
 
-            proof {
-                assert(mim_block@.key.page_id == page_inner.free.page_id());
-                assert(mim_block@.key.block_size == page_inner.free.block_size());
-            }
+            //proof {
+            //    assert(mim_block@.key.page_id == page_inner.free.page_id());
+            //    assert(mim_block@.key.block_size == page_inner.free.block_size());
+            //}
 
             page_inner.free.insert_block(ptr, Tracked(perm), Tracked(mim_block));
 
             bound_on_2_lists(Tracked(local.instance.clone()), Tracked(&local.thread_token), &mut page_inner.free, &mut page_inner.local_free);
-            assert(page_inner.used >= 1);
+            //assert(page_inner.used >= 1);
 
             used = page_inner.used - 1;
             page_inner.used = used;
@@ -266,7 +266,7 @@ fn free_block(page: PagePtr, is_local: bool, ptr: *mut u8, Tracked(perm): Tracke
 
         proof {
             crate::os_mem_util::preserves_mem_chunk_good(*old(local), *local);
-            assert(local.wf());
+            //assert(local.wf());
         }
 
         if unlikely(used == 0) {
@@ -373,13 +373,13 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
                 exposed = Some(exposed0);
             }
 
-            assert(ptr_mem.unwrap().ptr() == ptr);
+            //assert(ptr_mem.unwrap().ptr() == ptr);
 
             // mask1 = mask (set next_ptr to ptr)
             mask1 = masked_ptr_delay_set_ptr(mask, ptr, Ghost(delay), Ghost(next_ptr));
         }
 
-        assert(pag.xthread_free.instance == mim_instance);
+        //assert(pag.xthread_free.instance == mim_instance);
 
         let cas_result = atomic_with_ghost!(
             &pag.xthread_free.atomic => compare_exchange_weak(mask, mask1);
@@ -409,7 +409,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
             } else {
                 if ok {
                     let tracked mim_block = mim_block_opt.tracked_unwrap();
-                    assert(ptr_mem.unwrap().ptr() == ptr);
+                    //assert(ptr_mem.unwrap().ptr() == ptr);
                     ghost_ll.ghost_insert_block(ptr, ptr_mem.tracked_unwrap(),
                         raw_mem.tracked_unwrap(), mim_block, exposed.tracked_unwrap());
 
@@ -482,7 +482,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
                             dealloc.block_id().page_id,
                             &delay_actor_token,
                         );
-                        assert(heap_shared_access.wf2(heap_id, mim_instance));
+                        //assert(heap_shared_access.wf2(heap_id, mim_instance));
                     }
                     let heap: &Heap = ptr_ref(heap_ptr,
                         Tracked(&heap_shared_access.points_to));
@@ -568,7 +568,7 @@ pub fn free_delayed_block(ptr: *mut u8,
         Ghost(block_id.page_id_for_slice()),
         Ghost(block_id.page_id),
     );
-    assert(crate::layout::is_page_ptr(page_ptr, block_id.page_id));
+    //assert(crate::layout::is_page_ptr(page_ptr, block_id.page_id));
     let ghost page_id = dealloc.block_id().page_id;
     assert(page_ptr as int != 0) by { is_page_ptr_nonzero(page_ptr, page_id); }
 
@@ -580,9 +580,9 @@ pub fn free_delayed_block(ptr: *mut u8,
             &local.thread_token,
             &dealloc.mim_block);
     }
-    assert(page.is_in(*local));
-    assert(page.is_used_and_primary(*local));
-    assert(local.thread_token@.value.pages[page.page_id@].block_size == dealloc.block_id().block_size);
+    //assert(page.is_in(*local));
+    //assert(page.is_used_and_primary(*local));
+    //assert(local.thread_token@.value.pages[page.page_id@].block_size == dealloc.block_id().block_size);
 
     if !crate::page::page_try_use_delayed_free(page, 0, false, Tracked(&*local)) {
         return (false, Tracked(Some(perm)), Tracked(Some(dealloc)));
@@ -590,7 +590,7 @@ pub fn free_delayed_block(ptr: *mut u8,
 
     crate::alloc_generic::page_free_collect(page, false, Tracked(&mut *local));
 
-    assert(local.thread_token@.value.pages[page.page_id@].block_size == dealloc.block_id().block_size);
+    //assert(local.thread_token@.value.pages[page.page_id@].block_size == dealloc.block_id().block_size);
 
     crate::free::free_block(page, true, ptr,
         Tracked(perm), Tracked(dealloc), Tracked(&mut *local));

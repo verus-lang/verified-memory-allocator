@@ -3,7 +3,6 @@
 set -e
 
 BASEDIR=$(realpath $(dirname "$0"))
-VERUS_DIR=$BASEDIR/../../verus
 
 # build the rlib file for libc crate, which verus-mimalloc takes as a dependency
 

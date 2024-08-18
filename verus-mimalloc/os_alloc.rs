@@ -56,6 +56,7 @@ pub fn os_alloc_aligned_offset(
     }
 }
 
+#[verifier::spinoff_prover]
 pub fn os_good_alloc_size(size: usize) -> (res: usize)
     requires size as int % page_size() == 0,
     ensures res as int % page_size() == 0,

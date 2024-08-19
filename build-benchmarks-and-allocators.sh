@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -x
 
 # build our allocators
 ./build-verus-mimalloc.sh
@@ -9,3 +10,5 @@ set -e
 cd mimalloc-bench
 ./build-bench-env.sh bench    # build benchmarks
 ./build-bench-env.sh mi       # build allocators to compare to (e.g., mimalloc) 
+
+echo 'Build successful'

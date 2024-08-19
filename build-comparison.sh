@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # build our allocators
 ./build-verus-mimalloc.sh
 

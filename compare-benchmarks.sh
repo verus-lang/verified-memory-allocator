@@ -1,3 +1,5 @@
+#!/bin/bash
+
 set -e
 
 cd mimalloc-bench/out/bench
@@ -7,4 +9,4 @@ cd mimalloc-bench/out/bench
 
 cd ../../..
 
-python3 compare-benchmarks.py
+python3 process-benchmarks-output.py

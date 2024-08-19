@@ -1,8 +1,8 @@
-DIR=/Users/tjhance/Dropbox/vmi/verus-mimalloc
+DIR=$(dirname "$(readlink -f "$0")")
 LCDIR=/Users/tjhance/Dropbox/verus/source/tools/line_count
 
 rm -rf lib.d
-./rrv --emit=dep-info --no-verify
+verus --triggers-silent --no-auto-recommends-check --extern libc=../build/liblibc.rlib lib.rs --emit=dep-info --no-verify
 
 cd $LCDIR
 cargo run --release -- $DIR/lib.d -p 2> ~/o

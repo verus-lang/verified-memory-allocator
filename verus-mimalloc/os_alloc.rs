@@ -87,6 +87,7 @@ pub fn os_good_alloc_size(size: usize) -> (res: usize)
             if size <= SEGMENT_SIZE {
                 assert((size + page_size() - 1) / page_size() <= 8192);
                 assert((size + page_size() - 1) / page_size() * page_size() <= SEGMENT_SIZE);
+                assert((SEGMENT_SIZE + 0x400000 - 1) / 0x400000 as int == 8) by(compute); // needed on x64-docker
             }
         }
         return x;

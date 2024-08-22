@@ -24,8 +24,8 @@ for f in j["files"]:
         else:
             top_trusted += j["files"][f]["trusted"]
 
-total_exec = j["total"]["exec"]
-total_spec_proof = j["total"]["proof"] + j["total"]["spec"]
+total_exec = j["total"]["exec"] + j["total"]["proof,exec"]
+total_spec_proof = j["total"]["proof"] + j["total"]["spec"] + j["total"]["proof,exec"]
 
 total_total = bottom_trusted + top_trusted + total_exec + total_spec_proof
     

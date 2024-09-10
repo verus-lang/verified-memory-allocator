@@ -1479,13 +1479,13 @@ fn segment_os_alloc(
         /*assert(segment.wf());
         assert(mem.wf());
         assert(mem.os_exact_range(segment.segment_ptr.id(), SEGMENT_SIZE as int));*/
-        assert(set_int_range(
-            segment_start(segment.segment_id@),
-            segment_start(segment.segment_id@) + COMMIT_SIZE
-          ).subset_of( pcommit_mask.bytes(segment.segment_id@) ))
-        by {
-            reveal(CommitMask::bytes);
-        }
+        //assert(set_int_range(
+        //    segment_start(segment.segment_id@),
+        //    segment_start(segment.segment_id@) + COMMIT_SIZE
+        //  ).subset_of( pcommit_mask.bytes(segment.segment_id@) ))
+        //by {
+        crate::commit_mask::set_int_range_commit_size(segment.segment_id@, *pcommit_mask);
+        //}
         assert(pcommit_mask.bytes(segment.segment_id@).subset_of(mem.os_rw_bytes()))
         by {
             reveal(CommitMask::bytes);

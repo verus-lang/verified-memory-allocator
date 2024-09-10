@@ -8,6 +8,7 @@ use vstd::*;
 use vstd::modes::*;
 use vstd::set_lib::*;
 use vstd::cell::*;
+use vstd::shared::Shared;
 
 use crate::tokens::{Mim, BlockId, DelayState, ThreadState, HeapState, HeapId, TldId, ThreadId};
 use crate::types::*;
@@ -21,7 +22,6 @@ use crate::bin_sizes::*;
 use crate::page_organization::*;
 use crate::os_mem::*;
 use crate::thread::*;
-use crate::duplicable::Duplicable;
 
 verus!{
 
@@ -677,7 +677,7 @@ fn thread_data_alloc()
 
 /*
 pub fn get_page_empty()
-    -> (res: (PPtr<Page>, Tracked<Duplicable<PageFullAccess>>))
+    -> (res: (PPtr<Page>, Tracked<Shared<PageFullAccess>>))
     ensures ({ let (page_ptr, pfa) = res; {
         pfa@@.wf_empty_page_global()
         && pfa@@.s.points_to@.pptr == page_ptr.id()
@@ -691,7 +691,7 @@ pub fn get_page_empty()
 
 struct EmptyPageStuff {
     ptr: *mut Page,
-    pfa: Tracked<Duplicable<PageFullAccess>>,
+    pfa: Tracked<Shared<PageFullAccess>>,
 }
 
 impl EmptyPageStuff {
@@ -764,7 +764,7 @@ fn init_empty_page_ptr() -> (e: EmptyPageStuff)
     });
     let Tracked(exposed) = expose_provenance(page_ptr);
 
-    let tracked pfa = Duplicable::new(PageFullAccess {
+    let tracked pfa = Shared::new(PageFullAccess {
         s: PageSharedAccess { points_to, exposed },
         l: PageLocalAccess {
             count: count_perm,

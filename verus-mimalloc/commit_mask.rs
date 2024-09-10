@@ -3,6 +3,7 @@ use crate::config::*;
 use crate::tokens::*;
 use crate::layout::*;
 use crate::types::*;
+use vstd::set_lib::set_int_range;
 
 verus!{
 
@@ -773,5 +774,13 @@ impl CommitMask {
         return true;
     }
 }
+
+pub proof fn set_int_range_commit_size(sid: SegmentId, mask: CommitMask)
+    requires mask@.contains(0)
+    ensures set_int_range(segment_start(sid), segment_start(sid) + COMMIT_SIZE) <= mask.bytes(sid)
+{
+    reveal(CommitMask::bytes);
+}
+
 
 }

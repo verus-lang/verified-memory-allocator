@@ -6,6 +6,7 @@ use vstd::modes::*;
 use vstd::*;
 use vstd::cell::*;
 use vstd::atomic_ghost::*;
+use vstd::shared::Shared;
 use state_machines_macros::*;
 
 use crate::config::*;
@@ -17,7 +18,6 @@ use crate::os_mem::MemChunk;
 use crate::commit_mask::CommitMask;
 use crate::bin_sizes::{valid_bin_idx, size_of_bin, smallest_bin_fitting_size};
 use crate::arena::{ArenaId, MemId};
-use crate::duplicable::Duplicable;
 
 verus!{
 
@@ -666,7 +666,7 @@ pub tracked struct Local {
 
     pub ghost page_organization: PageOrg::State,
 
-    pub tracked page_empty_global: Duplicable<PageFullAccess>,
+    pub tracked page_empty_global: Shared<PageFullAccess>,
 }
 
 pub open spec fn common_preserves(l1: Local, l2: Local) -> bool {
@@ -1177,7 +1177,7 @@ impl HeapPtr {
 
     #[inline(always)]
     pub fn get_page_empty(&self, Tracked(local): Tracked<&Local>)
-        -> (res: (*mut Page, Tracked<Duplicable<PageFullAccess>>))
+        -> (res: (*mut Page, Tracked<Shared<PageFullAccess>>))
     requires
         local.wf_basic(),
         self.wf(),

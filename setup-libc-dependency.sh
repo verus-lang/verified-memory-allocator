@@ -11,7 +11,7 @@ mkdir -p build
 
 cd test_libc
 cargo clean
-cargo +1.76.0 build --release
+cargo +1.79.0 build --release
 cd ..
 LIBC_RLIB_NAME=$(find ./test_libc/target/release/deps/ -name 'liblibc-*.rlib')
 cp $LIBC_RLIB_NAME build/liblibc.rlib

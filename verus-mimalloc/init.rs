@@ -389,7 +389,7 @@ fn pages_tmp() -> (pages: [PageQueue; 75])
     ];
 
     proof {
-        assert forall |p| 0 <= p < pages@.len() ==> (#[trigger] pages[p]).first.addr() == 0
+        assert forall |p| 0 <= p < pages@.len() implies (#[trigger] pages[p]).first.addr() == 0
             && pages[p].last.addr() == 0
             && (valid_bin_idx(p) ==> pages[p].block_size == size_of_bin(p))
         by {

@@ -40,8 +40,7 @@ pub fn heap_malloc(heap: HeapPtr, size: usize, Tracked(local): Tracked<&mut Loca
         ({ // $line_count$Trusted$
             let (ptr, points_to_raw, dealloc) = t; // $line_count$Trusted$
 
-            dealloc@.wf() // $line_count$Trusted$
-              && points_to_raw@.is_range(ptr as int, size as int)  // $line_count$Trusted$
+            points_to_raw@.is_range(ptr as int, size as int)  // $line_count$Trusted$
               && points_to_raw@.provenance() == ptr@.provenance  // $line_count$Trusted$
               && ptr == dealloc@.ptr()  // $line_count$Trusted$
               && dealloc@.inst() == local.inst()  // $line_count$Trusted$
@@ -62,8 +61,7 @@ pub fn heap_malloc_zero(heap: HeapPtr, size: usize, zero: bool, Tracked(local): 
         local.wf(),
         ({
             let (ptr, points_to_raw, dealloc) = t;
-            dealloc@.wf()
-              && points_to_raw@.is_range(ptr as int, size as int)
+            points_to_raw@.is_range(ptr as int, size as int)
               && points_to_raw@.provenance() == ptr@.provenance
               && ptr == dealloc@.ptr()
               && dealloc@.inst() == local.inst()
@@ -85,8 +83,7 @@ pub fn heap_malloc_zero_ex(heap: HeapPtr, size: usize, zero: bool, huge_alignmen
         local.wf(),
         ({
             let (ptr, points_to_raw, dealloc) = t;
-            dealloc@.wf()
-              && points_to_raw@.is_range(ptr as int, size as int)
+            points_to_raw@.is_range(ptr as int, size as int)
               && points_to_raw@.provenance() == ptr@.provenance
               && ptr == dealloc@.ptr()
               && dealloc@.inst() == local.instance
@@ -148,8 +145,7 @@ pub fn heap_malloc_small_zero(
         local.wf(),
         ({
             let (ptr, points_to_raw, dealloc) = t;
-            dealloc@.wf()
-              && points_to_raw@.is_range(ptr as int, size as int)
+            points_to_raw@.is_range(ptr as int, size as int)
               && points_to_raw@.provenance() == ptr@.provenance
               && ptr == dealloc@.ptr()
               && dealloc@.inst() == local.instance
@@ -203,8 +199,7 @@ pub fn page_malloc(
         ({
             let (ptr, points_to_raw, dealloc) = t;
 
-            dealloc@.wf()
-              && points_to_raw@.is_range(ptr as int, size as int)
+            points_to_raw@.is_range(ptr as int, size as int)
               && points_to_raw@.provenance() == ptr@.provenance
               && ptr == dealloc@.ptr()
               && dealloc@.inst() == local.instance

@@ -34,8 +34,7 @@ pub fn malloc_generic(
         ({
             let (ptr, points_to_raw, dealloc) = t;
 
-            dealloc@.wf()
-              && points_to_raw@.is_range(ptr as int, size as int)
+            points_to_raw@.is_range(ptr as int, size as int)
               && points_to_raw@.provenance() == ptr@.provenance
               && ptr == dealloc@.ptr()
               && dealloc@.inst() == local.instance

@@ -56,7 +56,6 @@ pub fn free(ptr: *mut u8, Tracked(user_perm): Tracked<PointsToRaw>, Tracked(user
     requires
         old(local).wf(),
         ptr.addr() != 0 ==> user_dealloc.is_some(),
-        ptr.addr() != 0 ==> user_dealloc.unwrap().wf(),
         ptr.addr() != 0 ==> user_perm.is_range(ptr as int, user_dealloc.unwrap().size()),
         ptr.addr() != 0 ==> user_perm.provenance() == ptr@.provenance,
         ptr.addr() != 0 ==> ptr == user_dealloc.unwrap().ptr(),

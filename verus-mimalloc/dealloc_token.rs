@@ -9,13 +9,13 @@ use vstd::set_lib::*;
 verus!{
 
 pub tracked struct MimDealloc {
-    pub tracked padding: PointsToRaw,
+    pub(crate) tracked padding: PointsToRaw,
 
     // Size of the allocation from the user perspective, <= the block size
-    pub ghost _size: int,
+    pub(crate) ghost _size: int,
 
     // Memory to make up the difference between user size and block size
-    pub tracked inner: MimDeallocInner,
+    pub(crate) tracked inner: MimDeallocInner,
 }
 
 pub tracked struct MimDeallocInner {
@@ -68,7 +68,7 @@ impl MimDeallocInner {
         &&& is_block_ptr(self.ptr, self.block_id())
     }
 
-    pub proof fn into_user(tracked self, tracked points_to_raw: PointsToRaw, sz: int)
+    pub(crate) proof fn into_user(tracked self, tracked points_to_raw: PointsToRaw, sz: int)
         -> (tracked res: (MimDealloc, PointsToRaw))
 
         requires
@@ -78,10 +78,9 @@ impl MimDeallocInner {
             0 <= sz <= self.block_id().block_size,
         ensures ({
             let (md, points_to_raw) = res;
-            md.wf()
-            && points_to_raw.is_range(self.ptr as int, sz)
+            points_to_raw.is_range(self.ptr as int, sz)
             && points_to_raw.provenance() == self.ptr@.provenance
-            && md._size == sz
+            && md.size() == sz
             && md.block_id() == self.block_id()
             && md.ptr() == self.ptr
             && md.inst() == self.mim_instance
@@ -94,24 +93,24 @@ impl MimDeallocInner {
 }
 
 impl MimDealloc {
-    #[verifier(inline)]
-    pub open spec fn block_id(&self) -> BlockId {
+    pub closed spec fn block_id(&self) -> BlockId {
         self.inner.block_id()
     }
 
-    pub open spec fn ptr(&self) -> *mut u8 {
+    pub closed spec fn ptr(&self) -> *mut u8 {
         self.inner.ptr
     }
 
-    pub open spec fn inst(&self) -> Mim::Instance {
+    pub closed spec fn inst(&self) -> Mim::Instance {
         self.inner.mim_instance
     }
 
-    pub open spec fn size(&self) -> int {
+    pub closed spec fn size(&self) -> int {
         self._size
     }
 
-    pub open spec fn wf(&self) -> bool {
+    #[verifier::type_invariant]
+    spec fn wf(&self) -> bool {
         self.inner.wf()
           // PAPER CUT: is_range should probably have this condition in it
           && self.block_id().block_size - self._size >= 0
@@ -121,12 +120,11 @@ impl MimDealloc {
           && self.padding.provenance() == self.inner.ptr@.provenance
     }
 
-    pub proof fn into_internal(tracked self, tracked points_to_raw: PointsToRaw)
+    pub(crate) proof fn into_internal(tracked self, tracked points_to_raw: PointsToRaw)
         -> (tracked res: (MimDeallocInner, PointsToRaw))
 
         requires
-            self.wf(),
-            points_to_raw.is_range(self.ptr() as int, self._size),
+            points_to_raw.is_range(self.ptr() as int, self.size()),
             points_to_raw.provenance() == self.ptr()@.provenance
         ensures ({
             let (md, points_to_raw_full) = res;
@@ -138,6 +136,7 @@ impl MimDealloc {
             && md.mim_instance == self.inst()
         })
     {
+        use_type_invariant(&self);
         let tracked MimDealloc { padding, _size, inner } = self;
         let tracked p = points_to_raw.join(padding);
         (inner, p)

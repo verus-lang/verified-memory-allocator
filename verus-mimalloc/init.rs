@@ -32,12 +32,12 @@ pub tracked struct Global {
 
 impl Global {
     pub closed spec fn wf(&self) -> bool {
-        self.my_inst@.instance == self.instance
-        && self.my_inst@.value == self.instance
+        self.my_inst.instance_id() == self.instance.id()
+        && self.my_inst.value() == self.instance.id()
     }
 
     pub open spec fn wf_right_to_use_thread(&self, right: RightToUseThread, tid: ThreadId) -> bool {
-        right@.instance == self.instance && right@.key == tid
+        right.instance_id() == self.instance.id() && right.element() == tid
     }
 
     pub open spec fn inst(&self) -> MimInst {
@@ -66,8 +66,8 @@ pub proof fn global_init() -> (tracked res: (Global, Map<ThreadId, Mim::right_to
     let tracked (Tracked(instance), Tracked(right_to_set_inst), _, _, Tracked(rights), _, _, _, _, _, _, _, _) = Mim::Instance::initialize(
         Map::tracked_empty(), Map::tracked_empty(), Map::tracked_empty(),
         );
-    let tracked my_inst = instance.set_inst(instance, right_to_set_inst.tracked_unwrap());
-    (Global { instance, my_inst }, rights)
+    let tracked my_inst = instance.set_inst(instance.id(), right_to_set_inst.tracked_unwrap());
+    (Global { instance, my_inst }, rights.into_map())
 }
 
 pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
@@ -111,7 +111,7 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
     let tld_ptr = addr.with_addr(addr.addr() + SIZEOF_HEAP) as *mut Tld;
 
     let tracked (_, _, Tracked(uniq_reservation_tok)) = global.instance.reserve_uniq_identifier();
-    let heap = HeapPtr { heap_ptr, heap_id: Ghost(HeapId { id: heap_ptr.addr() as nat, provenance: heap_ptr@.provenance, uniq: uniq_reservation_tok@.key.uniq }) };
+    let heap = HeapPtr { heap_ptr, heap_id: Ghost(HeapId { id: heap_ptr.addr() as nat, provenance: heap_ptr@.provenance, uniq: uniq_reservation_tok.element().uniq }) };
     let tld = TldPtr { tld_ptr, tld_id: Ghost(TldId { id: tld_ptr.addr() as nat, provenance: tld_ptr@.provenance }) };
 
     let page_empty_stuff = init_empty_page_ptr();
@@ -195,8 +195,8 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
     });
 
     let tracked heap_shared_access = HeapSharedAccess { points_to: points_to_heap };
-    assert(global.instance == right@.instance);
-    assert(right@.key == thread_id);
+    assert(global.instance.id() == right.instance_id());
+    assert(right.element() == thread_id);
 
     let tracked (Tracked(thread_token), Tracked(checked_token)) = global.instance.create_thread_mk_tokens(
             thread_id, 
@@ -260,8 +260,8 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
             local.heap.pages_free_direct@.value.unwrap()@,
             local.heap.pages@.value.unwrap()@,
             emp));
-        assert(local.heap.wf_basic(local.heap_id, local.thread_token@.value.heap, local.tld_id, local.instance));
-        assert(local.heap.wf(local.heap_id, local.thread_token@.value.heap, local.tld_id, local.instance, local.page_empty_global@.s.points_to.ptr()));
+        assert(local.heap.wf_basic(local.heap_id, local.thread_token.value().heap, local.tld_id, local.instance.id()));
+        assert(local.heap.wf(local.heap_id, local.thread_token.value().heap, local.tld_id, local.instance.id(), local.page_empty_global@.s.points_to.ptr()));
         assert(local.wf_main());
         assert(local.wf());
     }

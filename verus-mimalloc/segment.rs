@@ -1265,9 +1265,9 @@ fn segment_alloc(
         //assert(local.segments[segment_id].points_to.value().thread_id.wf(
         //    local.instance, segment_id));
         /*assert(local.segments[segment_id].wf(segment_id,
-                local.thread_token@.value.segments.index(segment_id),
+                local.thread_token.value().segments.index(segment_id),
                 local.instance));*/
-        assert(local.thread_token@.value.segments.dom() =~= local.segments.dom());
+        assert(local.thread_token.value().segments.dom() =~= local.segments.dom());
 
         /*let org_pages = local.page_organization.pages;
         let pages = local.pages;
@@ -1808,8 +1808,8 @@ fn segment_page_clear(page: PagePtr, tld: TldPtr, Tracked(local): Tracked<&mut L
     let ghost next_state = PageOrg::take_step::set_range_to_not_used(local.page_organization);
     let ghost n_slices = local.page_organization.pages[page_id].count.unwrap();
     //assert(page.is_used_and_primary(*local));
-    //assert(local.thread_token@.value.pages.dom().contains(page_id));
-    let ghost page_state = local.thread_token@.value.pages[page_id];
+    //assert(local.thread_token.value().pages.dom().contains(page_id));
+    let ghost page_state = local.thread_token.value().pages[page_id];
 
     let segment = SegmentPtr::ptr_segment(page);
 
@@ -1844,14 +1844,14 @@ fn segment_page_clear(page: PagePtr, tld: TldPtr, Tracked(local): Tracked<&mut L
         let tracked thread_state_tok = local.take_thread_token();
         let block_state_map = Map::new(
             |block_id: BlockId| block_tokens.dom().contains(block_id),
-            |block_id: BlockId| block_tokens[block_id]@.value,
+            |block_id: BlockId| block_tokens[block_id].value(),
         );
         assert(block_state_map.dom() =~= block_tokens.dom());
         let tracked thread_state_tok = local.instance.page_destroy_block_tokens(
             local.thread_id, page_id, block_state_map,
-            thread_state_tok, block_tokens);
+            thread_state_tok, Mim::block_map::from_map(local.instance.id(), block_tokens));
         assert forall |pid: PageId| page_id.range_from(0, n_slices as int).contains(pid)
-            implies thread_state_tok@.value.pages.dom().contains(pid)
+            implies thread_state_tok.value().pages.dom().contains(pid)
         by {
             assert(pid.segment_id == page_id.segment_id);
             assert(page_id.idx <= pid.idx < page_id.idx + n_slices);
@@ -1899,7 +1899,7 @@ fn segment_page_clear(page: PagePtr, tld: TldPtr, Tracked(local): Tracked<&mut L
     proof {
         /*assert forall |pid: PageId|
             page_id.range_from(0, n_slices as int).contains(pid) &&
-              page_id != pid implies local.thread_token@.value.pages[pid].offset != 0
+              page_id != pid implies local.thread_token.value().pages[pid].offset != 0
         by {
             //assert(local.page_organization.pages.dom().contains(pid));
             //assert(0 <= pid.idx < SLICES_PER_SEGMENT);
@@ -1928,21 +1928,21 @@ fn segment_page_clear(page: PagePtr, tld: TldPtr, Tracked(local): Tracked<&mut L
         /*assert forall |pid|
             #[trigger] local.pages.dom().contains(pid) implies
               ((local.unused_pages.dom().contains(pid) <==>
-                !local.thread_token@.value.pages.dom().contains(pid)))
+                !local.thread_token.value().pages.dom().contains(pid)))
         by {
             let s = page_id.range_from(0, n_slices as int);
             if local.unused_pages.dom().contains(pid) {
                 if s.contains(pid) {
-                    assert(!local.thread_token@.value.pages.dom().contains(pid));
+                    assert(!local.thread_token.value().pages.dom().contains(pid));
                 } else {
                     assert(!psa_map.dom().contains(pid));
                     assert(old(local).unused_pages.dom().contains(pid));
-                    assert(!old(local).thread_token@.value.pages.dom().contains(pid));
-                    assert(!local.thread_token@.value.pages.dom().contains(pid));
+                    assert(!old(local).thread_token.value().pages.dom().contains(pid));
+                    assert(!local.thread_token.value().pages.dom().contains(pid));
                 }
             }
             if !local.unused_pages.dom().contains(pid) {
-                assert(local.thread_token@.value.pages.dom().contains(pid));
+                assert(local.thread_token.value().pages.dom().contains(pid));
             }
         }*/
 
@@ -1963,7 +1963,7 @@ fn segment_page_clear(page: PagePtr, tld: TldPtr, Tracked(local): Tracked<&mut L
                     assert(old_psa[pid].points_to@.value.get_Some_0().offset as int == o * SIZEOF_PAGE_HEADER);
 
 
-                    assert(old(local).thread_token@.value.pages[pid].shared_access
+                    assert(old(local).thread_token.value().pages[pid].shared_access
                         .points_to@.value.get_Some_0().offset as int == o * SIZEOF_PAGE_HEADER);
 
                     assert(psa_map[pid].points_to@.value.get_Some_0().offset as int == o * SIZEOF_PAGE_HEADER);

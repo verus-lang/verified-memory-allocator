@@ -288,7 +288,7 @@ tokenized_state_machine!{ Mim {
         // Thread-local state to each entity
 
         #[sharding(bool)] pub right_to_set_inst: bool,
-        #[sharding(persistent_option)] pub my_inst: Option<Box<Mim::Instance>>,
+        #[sharding(persistent_option)] pub my_inst: Option<InstanceId>,
 
         /*
         #[sharding(map)] pub heap: Map<HeapId, HeapState>,
@@ -359,9 +359,9 @@ tokenized_state_machine!{ Mim {
     }
 
     transition!{
-        set_inst(inst: Mim::Instance) {
+        set_inst(inst: InstanceId) {
             remove right_to_set_inst -= true;
-            add my_inst (union)= Some(Box::new(inst));
+            add my_inst (union)= Some(inst);
         }
     }
 
@@ -544,7 +544,7 @@ tokenized_state_machine!{ Mim {
             birds_eye let hsa = pre.heap_shared_access.index(heap_id);
             birds_eye let psa = block_state.page_shared_access;
             add delay_actor += [ block_id.page_id => DelayFreeingActor::Heap(heap_id, hsa, psa) ];
-            assert(hsa.wf2(heap_id, *inst));
+            assert(hsa.wf2(heap_id, inst));
 
             //assert(hsa.wf(heap_id));
         }
@@ -654,7 +654,7 @@ tokenized_state_machine!{ Mim {
             require thread_state.segments.dom() =~= Set::empty();
             have my_inst >= Some(let inst);
 
-            require thread_state.heap.shared_access.wf2(thread_state.heap_id, *inst);
+            require thread_state.heap.shared_access.wf2(thread_state.heap_id, inst);
 
             deposit heap_shared_access +=
                 [ thread_state.heap_id => thread_state.heap.shared_access ]
@@ -1224,7 +1224,7 @@ tokenized_state_machine!{ Mim {
             #![trigger self.heap_shared_access.dom().contains(heap_id)]
             #![trigger self.heap_shared_access.index(heap_id)]
             self.heap_shared_access.dom().contains(heap_id)
-              ==> self.heap_shared_access[heap_id].wf2(heap_id, *self.my_inst.unwrap())
+              ==> self.heap_shared_access[heap_id].wf2(heap_id, self.my_inst.unwrap())
     }
 
     #[invariant]
@@ -1397,7 +1397,7 @@ tokenized_state_machine!{ Mim {
     fn initialize_inductive(post: Self) { }
    
     #[inductive(set_inst)]
-    fn set_inst_inductive(pre: Self, post: Self, inst: Mim::Instance) { }
+    fn set_inst_inductive(pre: Self, post: Self, inst: InstanceId) { }
    
     #[inductive(actor_make_idle)]
     fn actor_make_idle_inductive(pre: Self, post: Self, thread_id: ThreadId) { }

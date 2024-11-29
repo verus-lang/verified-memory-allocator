@@ -175,7 +175,7 @@ fn page_free_list_extend(
             requires capacity + extend - 1 <= reserved, bsize >= 0;
         assert((capacity + extend) * bsize <= reserved * bsize) by(nonlinear_arith)
             requires capacity + extend <= reserved, bsize >= 0;
-        //assert(bsize == local.thread_token@.value.pages[page_id].block_size);
+        //assert(bsize == local.thread_token.value().pages[page_id].block_size);
         //assert(count == local.pages[page_id].count@.value.unwrap());
     }
 
@@ -212,7 +212,7 @@ fn page_free_list_extend(
     let ghost mut extend_nat;
 
     //assert(page_inner.wf(page_ptr.page_id@,
-    //    local.thread_token@.value.pages.index(page_ptr.page_id@),
+    //    local.thread_token.value().pages.index(page_ptr.page_id@),
     //    local.instance));
 
     proof {
@@ -254,7 +254,7 @@ fn page_free_list_extend(
 
         let page_id = page_ptr.page_id@;
         let block_size = bsize as nat;
-        let ts = thread_token@.value;
+        let ts = thread_token.value();
         assert forall |i: nat| cap_nat <= i < cap_nat + extend_nat
             implies Mim::State::okay_to_add_block(ts, page_id, i, block_size)
         by {
@@ -297,6 +297,7 @@ fn page_free_list_extend(
         thread_token,
         checked_token,
     );
+    let tracked block_tokens = block_tokens.into_map();
     proof { local.thread_token = _thread_token; local.checked_token = _checked_token; }
     let tracked mut block_tokens = Map::tracked_map_keys(block_tokens,
         Map::<int, BlockId>::new(
@@ -327,11 +328,11 @@ fn page_free_list_extend(
         }
         assert forall |i: int| cap_nat <= i < cap_nat + extend_nat
             implies is_block_ptr1(
-                block_start(block_tokens.index(i)@.key),
-                block_tokens.index(i)@.key,
+                block_start(block_tokens.index(i).key()),
+                block_tokens.index(i).key(),
             )
         by {
-            let block_id = block_tokens.index(i)@.key;
+            let block_id = block_tokens.index(i).key();
             let block_size = bsize as int;
             reveal(is_block_ptr1);
             get_block_start_defn(block_id);
@@ -378,21 +379,21 @@ fn page_free_list_extend(
     proof {
         /*assert forall |pid|
             #[trigger] local.pages.dom().contains(pid) &&
-              local.thread_token@.value.pages.dom().contains(pid) implies
+              local.thread_token.value().pages.dom().contains(pid) implies
                 local.pages.index(pid).wf(
                   pid,
-                  local.thread_token@.value.pages.index(pid),
+                  local.thread_token.value().pages.index(pid),
                   local.instance,
                 )
         by {
             if pid.idx == page_ptr.page_id@.idx {
-                assert(local.pages.index(pid).wf(pid, local.thread_token@.value.pages.index(pid), local.instance));
+                assert(local.pages.index(pid).wf(pid, local.thread_token.value().pages.index(pid), local.instance));
             } else {
-                assert(old(local).pages.index(pid).wf(pid, old(local).thread_token@.value.pages.index(pid), old(local).instance));
+                assert(old(local).pages.index(pid).wf(pid, old(local).thread_token.value().pages.index(pid), old(local).instance));
                 assert(old(local).pages.index(pid) == local.pages.index(pid));
-                assert(old(local).thread_token@.value.pages.index(pid)
-                    == local.thread_token@.value.pages.index(pid));
-                assert(local.pages.index(pid).wf(pid, local.thread_token@.value.pages.index(pid), local.instance));
+                assert(old(local).thread_token.value().pages.index(pid)
+                    == local.thread_token.value().pages.index(pid));
+                assert(local.pages.index(pid).wf(pid, local.thread_token.value().pages.index(pid), local.instance));
             }
         }*/
 
@@ -441,7 +442,7 @@ pub fn page_extend_free(
 
     /*proof {
         assert(page_inner.wf(page_ptr.page_id@,
-            local.thread_token@.value.pages.index(page_ptr.page_id@),
+            local.thread_token.value().pages.index(page_ptr.page_id@),
             local.instance));
     }*/
 
@@ -459,7 +460,7 @@ pub fn page_extend_free(
         assert(local.page_organization.pages.dom().contains(page_id));
         assert(page_organization_matches_token_page(
             local.page_organization.pages[page_id],
-            local.thread_token@.value.pages[page_id]));
+            local.thread_token.value().pages[page_id]));
         assert(local.is_used_primary(page_id));
         assert(bsize != 0);
     }*/
@@ -500,17 +501,17 @@ fn heap_delayed_free_partial(heap: HeapPtr, Tracked(local): Tracked<&mut Local>)
             local.wf(),
             heap.wf(), heap.is_in(*local),
             ll.wf(), common_preserves(*old(local), *local),
-            ll.instance() == local.instance,
-            ll.heap_id() == Some(local.thread_token@.value.heap_id)
+            ll.instance().id() == local.instance.id(),
+            ll.heap_id() == Some(local.thread_token.value().heap_id)
     {
         let (ptr, Tracked(perm), Tracked(block)) = ll.pop_block();
         proof {
-            //assert(block@.value.heap_id == Some(local.thread_token@.value.heap_id));
+            //assert(block@.value.heap_id == Some(local.thread_token.value().heap_id));
             local.instance.block_in_heap_has_valid_page(
-                local.thread_token@.key, block@.key,
+                local.thread_token.key(), block.key(),
                 &local.thread_token, &block);
             local.instance.get_block_properties(
-                local.thread_token@.key, block@.key,
+                local.thread_token.key(), block.key(),
                 &local.thread_token, &block);
             //assert(valid_block_token(block, local.instance));
         }

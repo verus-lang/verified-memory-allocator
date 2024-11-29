@@ -391,27 +391,27 @@ fn page_init(heap_ptr: HeapPtr, page_ptr: PagePtr, block_size: usize, tld_ptr: T
                 //num_blocks: 0,
                 is_enabled: true,
                 shared_access: new_psa_map[pid],
-                .. thread_token@.value.pages[pid]
+                .. thread_token.value().pages[pid]
             });
         /*assert forall |pid: PageId| #[trigger] new_page_state_map2.dom().contains(pid) implies
                 new_page_state_map2[pid] == PageState {
                     is_enabled: true,
                     shared_access: new_psa_map[pid],
-                    .. thread_token@.value.pages[pid]
+                    .. thread_token.value().pages[pid]
                 }
         by {
             let a = new_page_state_map2[pid];
             let llama = PageState {
                     is_enabled: true,
                     shared_access: new_psa_map[pid],
-                    .. thread_token@.value.pages[pid]
+                    .. thread_token.value().pages[pid]
                 };
-            assert(llama.offset == thread_token@.value.pages[pid].offset);
+            assert(llama.offset == thread_token.value().pages[pid].offset);
             assert(new_page_state_map2[pid].is_enabled == true);
             assert(new_page_state_map2[pid].shared_access == new_psa_map[pid]);
-            assert(new_page_state_map2[pid].num_blocks == thread_token@.value.pages[pid].num_blocks);
-            assert(new_page_state_map2[pid].offset == thread_token@.value.pages[pid].offset);
-            assert(new_page_state_map2[pid].block_size == thread_token@.value.pages[pid].block_size);
+            assert(new_page_state_map2[pid].num_blocks == thread_token.value().pages[pid].num_blocks);
+            assert(new_page_state_map2[pid].offset == thread_token.value().pages[pid].offset);
+            assert(new_page_state_map2[pid].block_size == thread_token.value().pages[pid].block_size);
             assert(a == llama);
             assert(a.offset == llama.offset);
             assert(a.block_size == llama.block_size);
@@ -439,27 +439,27 @@ fn page_init(heap_ptr: HeapPtr, page_ptr: PagePtr, block_size: usize, tld_ptr: T
 
         /*assert forall |pid|
             #[trigger] local.pages.dom().contains(pid) &&
-              local.thread_token@.value.pages.dom().contains(pid) implies
+              local.thread_token.value().pages.dom().contains(pid) implies
                 local.pages.index(pid).wf(
                   pid,
-                  local.thread_token@.value.pages.index(pid),
+                  local.thread_token.value().pages.index(pid),
                   local.instance,
                 )
         by {
             if range.contains(pid) {
                 if pid.idx == page_id.idx {
-                    assert(local.pages.index(pid).wf(pid, local.thread_token@.value.pages.index(pid), local.instance));
+                    assert(local.pages.index(pid).wf(pid, local.thread_token.value().pages.index(pid), local.instance));
                 } else {
                     assert(old(local).pages.index(pid).wf_unused(pid, 
                         old(local).unused_pages[pid], old(local).page_organization.popped, old(local).instance));
                     assert(old(local).unused_pages[pid] ==
-                        local.thread_token@.value.pages.index(pid).shared_access);
+                        local.thread_token.value().pages.index(pid).shared_access);
                     assert(old(local).pages.index(pid).wf_unused(pid, 
-                        local.thread_token@.value.pages.index(pid).shared_access, local.page_organization.popped, local.instance));
-                    assert(local.pages.index(pid).wf(pid, local.thread_token@.value.pages.index(pid), local.instance));
+                        local.thread_token.value().pages.index(pid).shared_access, local.page_organization.popped, local.instance));
+                    assert(local.pages.index(pid).wf(pid, local.thread_token.value().pages.index(pid), local.instance));
                 }
             } else {
-                assert(local.pages.index(pid).wf(pid, local.thread_token@.value.pages.index(pid), local.instance));
+                assert(local.pages.index(pid).wf(pid, local.thread_token.value().pages.index(pid), local.instance));
             }
         }*/
 
@@ -467,7 +467,7 @@ fn page_init(heap_ptr: HeapPtr, page_ptr: PagePtr, block_size: usize, tld_ptr: T
             #[trigger] local.segments.dom().contains(segment_id) ==>
               local.segments[segment_id].wf(
                 segment_id,
-                local.thread_token@.value.segments.index(segment_id),
+                local.thread_token.value().segments.index(segment_id),
                 local.instance,
               )
         by {

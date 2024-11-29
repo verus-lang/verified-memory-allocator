@@ -139,7 +139,7 @@ struct_with_invariants!{
         predicate {
             self.instance == instance
             && self.page_id == page_id
-            && self.emp@@.instance == self.emp_inst@
+            && self.emp@.instance_id() == self.emp_inst@.id()
         }
         invariant
             on atomic
@@ -147,14 +147,14 @@ struct_with_invariants!{
             is (v: *mut Heap, all_g: (BoolAgree::y, Option<Mim::heap_of_page>))
         {
             let (is_emp, g_opt) = all_g;
-            is_emp@.instance == emp_inst@
+            is_emp.instance_id() == emp_inst@.id()
             && (match g_opt {
-                None => is_emp@.value,
+                None => is_emp.value(),
                 Some(g) => {
-                    &&& !is_emp@.value
-                    &&& g@.instance == instance
-                    &&& g@.key == page_id
-                    &&& is_heap_ptr(v, g@.value)
+                    &&& !is_emp.value()
+                    &&& g.instance_id() == instance@.id()
+                    &&& g.key() == page_id
+                    &&& is_heap_ptr(v, g.value())
                 }
             })
         }
@@ -162,7 +162,7 @@ struct_with_invariants!{
 }
 
 impl AtomicHeapPtr {
-    pub open spec fn is_empty(&self) -> bool { self.emp@@.value }
+    pub open spec fn is_empty(&self) -> bool { self.emp@.value() }
 
     pub fn empty() -> (ahp: AtomicHeapPtr)
         ensures ahp.is_empty(),
@@ -184,8 +184,8 @@ impl AtomicHeapPtr {
             !old(self).is_empty(),
         ensures
             self.is_empty(),
-            hop@@.instance == old(self).instance@,
-            hop@@.key == old(self).page_id@,
+            hop@.instance_id() == old(self).instance@.id(),
+            hop@.key() == old(self).page_id@,
     {
         let tracked mut heap_of_page;
         atomic_with_ghost!(
@@ -429,9 +429,9 @@ struct_with_invariants!{
             with (instance, segment_id)
             is (v: u64, g: Mim::thread_of_segment)
         {
-            &&& g@.instance == instance
-            &&& g@.key == segment_id
-            &&& g@.value == ThreadId { thread_id: v }
+            &&& g.instance_id() == instance@.id()
+            &&& g.key() == segment_id
+            &&& g.value() == ThreadId { thread_id: v }
         }
     }
 }
@@ -524,9 +524,9 @@ pub struct HeapLocalAccess {
 }
 
 impl Heap {
-    pub open spec fn wf(&self, heap_id: HeapId, tld_id: TldId, mim_instance: Mim::Instance) -> bool {
+    pub open spec fn wf(&self, heap_id: HeapId, tld_id: TldId, mim_instance: InstanceId) -> bool {
         &&& self.thread_delayed_free.wf()
-        &&& self.thread_delayed_free.instance == mim_instance
+        &&& self.thread_delayed_free.instance@.id() == mim_instance
         &&& self.thread_delayed_free.heap_id == heap_id
         &&& self.tld_ptr.wf()
         &&& self.tld_ptr.tld_id == tld_id
@@ -534,13 +534,13 @@ impl Heap {
 }
 
 impl HeapSharedAccess {
-    pub open spec fn wf(&self, heap_id: HeapId, tld_id: TldId, mim_instance: Mim::Instance) -> bool {
+    pub open spec fn wf(&self, heap_id: HeapId, tld_id: TldId, mim_instance: InstanceId) -> bool {
         is_heap_ptr(self.points_to.ptr(), heap_id)
           && self.points_to.is_init()
           && self.points_to.value().wf(heap_id, tld_id, mim_instance)
     }
 
-    pub open spec fn wf2(&self, heap_id: HeapId, mim_instance: Mim::Instance) -> bool {
+    pub open spec fn wf2(&self, heap_id: HeapId, mim_instance: InstanceId) -> bool {
         self.wf(heap_id, self.points_to.value().tld_ptr.tld_id@,
             mim_instance)
     }
@@ -564,7 +564,7 @@ pub open spec fn pages_free_direct_is_correct(pfd: Seq<*mut Page>, pages: Seq<Pa
 }
 
 impl HeapLocalAccess {
-    pub open spec fn wf(&self, heap_id: HeapId, heap_state: HeapState, tld_id: TldId, mim_instance: Mim::Instance, emp: *mut Page) -> bool {
+    pub open spec fn wf(&self, heap_id: HeapId, heap_state: HeapState, tld_id: TldId, mim_instance: InstanceId, emp: *mut Page) -> bool {
 
         self.wf_basic(heap_id, heap_state, tld_id, mim_instance)
           && pages_free_direct_is_correct(
@@ -574,7 +574,7 @@ impl HeapLocalAccess {
           && heap_state.shared_access.points_to.value().page_empty_ptr == emp
     }
 
-    pub open spec fn wf_basic(&self, heap_id: HeapId, heap_state: HeapState, tld_id: TldId, mim_instance: Mim::Instance) -> bool {
+    pub open spec fn wf_basic(&self, heap_id: HeapId, heap_state: HeapState, tld_id: TldId, mim_instance: InstanceId) -> bool {
       heap_state.shared_access.wf(heap_id, tld_id, mim_instance)
         && {
             let heap = heap_state.shared_access.points_to.value();
@@ -688,53 +688,53 @@ impl Local {
     pub open spec fn wf_basic(&self) -> bool {
         &&& is_tld_ptr(self.tld.ptr(), self.tld_id)
 
-        &&& self.thread_token@.instance == self.instance
-        &&& self.thread_token@.key == self.thread_id
+        &&& self.thread_token.instance_id() == self.instance.id()
+        &&& self.thread_token.key() == self.thread_id
 
-        &&& self.thread_token@.value.segments.dom() == self.segments.dom()
+        &&& self.thread_token.value().segments.dom() == self.segments.dom()
 
-        &&& self.thread_token@.value.heap_id == self.heap_id
-        &&& self.heap.wf_basic(self.heap_id, self.thread_token@.value.heap, self.tld_id, self.instance)
+        &&& self.thread_token.value().heap_id == self.heap_id
+        &&& self.heap.wf_basic(self.heap_id, self.thread_token.value().heap, self.tld_id, self.instance.id())
 
-        &&& self.thread_token@.value.heap.shared_access.points_to.value().page_empty_ptr == self.page_empty_global@.s.points_to.ptr()
+        &&& self.thread_token.value().heap.shared_access.points_to.value().page_empty_ptr == self.page_empty_global@.s.points_to.ptr()
         &&& self.page_empty_global@.wf_empty_page_global()
     }
 
     pub open spec fn wf_main(&self) -> bool {
         &&& is_tld_ptr(self.tld.ptr(), self.tld_id)
 
-        &&& self.thread_token@.instance == self.instance
-        &&& self.thread_token@.key == self.thread_id
+        &&& self.thread_token.instance_id() == self.instance.id()
+        &&& self.thread_token.key() == self.thread_id
         &&& self.thread_id == self.is_thread@
 
-        &&& self.checked_token@.instance == self.instance
-        &&& self.checked_token@.key == self.thread_id
+        &&& self.checked_token.instance_id() == self.instance.id()
+        &&& self.checked_token.key() == self.thread_id
 
-        &&& self.my_inst@.instance == self.instance
-        &&& self.my_inst@.value == self.instance
+        &&& self.my_inst.instance_id() == self.instance.id()
+        &&& self.my_inst.value() == self.instance.id()
 
         //&&& (forall |page_id|
-        //    self.thread_token@.value.pages.dom().contains(page_id) <==>
+        //    self.thread_token.value().pages.dom().contains(page_id) <==>
         //    self.pages.dom().contains(page_id))
-        //&&& self.thread_token@.value.pages.dom() == self.pages.dom()
-        &&& self.thread_token@.value.segments.dom() == self.segments.dom()
+        //&&& self.thread_token.value().pages.dom() == self.pages.dom()
+        &&& self.thread_token.value().segments.dom() == self.segments.dom()
 
-        &&& self.thread_token@.value.heap_id == self.heap_id
-        &&& self.heap.wf(self.heap_id, self.thread_token@.value.heap, self.tld_id, self.instance, self.page_empty_global@.s.points_to.ptr())
+        &&& self.thread_token.value().heap_id == self.heap_id
+        &&& self.heap.wf(self.heap_id, self.thread_token.value().heap, self.tld_id, self.instance.id(), self.page_empty_global@.s.points_to.ptr())
 
         &&& (forall |page_id|
             #[trigger] self.pages.dom().contains(page_id) ==>
             // Page is either 'used' or 'unused'
               (self.unused_pages.dom().contains(page_id) <==>
-                !self.thread_token@.value.pages.dom().contains(page_id)))
+                !self.thread_token.value().pages.dom().contains(page_id)))
 
-        &&& self.thread_token@.value.pages.dom().subset_of(self.pages.dom())
+        &&& self.thread_token.value().pages.dom().subset_of(self.pages.dom())
         &&& (forall |page_id|
             #[trigger] self.pages.dom().contains(page_id) ==>
-              self.thread_token@.value.pages.dom().contains(page_id) ==>
+              self.thread_token.value().pages.dom().contains(page_id) ==>
                 self.pages.index(page_id).wf(
                   page_id,
-                  self.thread_token@.value.pages.index(page_id),
+                  self.thread_token.value().pages.index(page_id),
                   self.instance,
                 )
             )
@@ -748,7 +748,7 @@ impl Local {
             #[trigger] self.segments.dom().contains(segment_id) ==>
               self.segments[segment_id].wf(
                 segment_id,
-                self.thread_token@.value.segments.index(segment_id),
+                self.thread_token.value().segments.index(segment_id),
                 self.instance,
               )
             )
@@ -787,14 +787,14 @@ impl Local {
         //  #[trigger] self.page_organization.pages.dom().contains(page_id)
         //    ==> self.page_organization.pages[page_id].is_used
         //    ==> self.page_organization.pages[page_id].offset == Some(0nat)
-        //    ==> self.thread_token@.value.pages[page_id].offset == 0)
+        //    ==> self.thread_token.value().pages[page_id].offset == 0)
 
         &&& (forall |page_id| 
           #[trigger] self.page_organization.pages.dom().contains(page_id)
             ==> self.page_organization.pages[page_id].is_used
             ==> page_organization_matches_token_page(
                     self.page_organization.pages[page_id],
-                    self.thread_token@.value.pages[page_id]))
+                    self.thread_token.value().pages[page_id]))
 
         &&& (forall |page_id: PageId| (#[trigger] self.unused_pages.dom().contains(page_id)) ==>
             self.page_organization.pages.dom().contains(page_id))
@@ -802,14 +802,14 @@ impl Local {
         &&& (forall |page_id: PageId| #[trigger] self.unused_pages.dom().contains(page_id) ==>
             self.unused_pages[page_id] == self.psa[page_id])
 
-        &&& (forall |page_id: PageId| #[trigger] self.thread_token@.value.pages.dom().contains(page_id) ==>
-            self.thread_token@.value.pages[page_id].shared_access == self.psa[page_id])
+        &&& (forall |page_id: PageId| #[trigger] self.thread_token.value().pages.dom().contains(page_id) ==>
+            self.thread_token.value().pages[page_id].shared_access == self.psa[page_id])
     }
 
     pub open spec fn page_state(&self, page_id: PageId) -> PageState
-        recommends self.thread_token@.value.pages.dom().contains(page_id)
+        recommends self.thread_token.value().pages.dom().contains(page_id)
     {
-        self.thread_token@.value.pages.index(page_id)
+        self.thread_token.value().pages.index(page_id)
     }
 
     pub open spec fn page_inner(&self, page_id: PageId) -> PageInner
@@ -1047,7 +1047,7 @@ impl HeapPtr {
             self.wf(),
             self.is_in(*local),
         ensures
-            MemContents::Init(*heap) == local.thread_token@.value.heap.shared_access.points_to.opt_value(),
+            MemContents::Init(*heap) == local.thread_token.value().heap.shared_access.points_to.opt_value(),
     {
         let tracked perm = &local.instance.thread_local_state_guards_heap(
             local.thread_id, &local.thread_token).points_to;
@@ -1170,7 +1170,7 @@ impl HeapPtr {
             self.is_in(*local),
         ensures
             arena_id
-             == local.thread_token@.value.heap.shared_access.points_to.value().arena_id,
+             == local.thread_token.value().heap.shared_access.points_to.value().arena_id,
     {
         self.get_ref(Tracked(local)).arena_id
     }
@@ -1346,16 +1346,16 @@ impl SegmentPtr {
     pub fn get_ref<'a>(&self, Tracked(local): Tracked<&'a Local>) -> (segment: &'a SegmentHeader)
         requires
             //local.wf_main(),
-            local.thread_token@.value.segments.dom().contains(self.segment_id@),
-            local.thread_token@.value.segments[self.segment_id@].shared_access.points_to.ptr() == self.segment_ptr,
-            local.thread_token@.value.segments[self.segment_id@].shared_access.points_to.is_init(),
-            local.thread_token@.value.segments[self.segment_id@].is_enabled,
-            local.thread_token@.key == local.thread_id,
-            local.thread_token@.instance == local.instance,
+            local.thread_token.value().segments.dom().contains(self.segment_id@),
+            local.thread_token.value().segments[self.segment_id@].shared_access.points_to.ptr() == self.segment_ptr,
+            local.thread_token.value().segments[self.segment_id@].shared_access.points_to.is_init(),
+            local.thread_token.value().segments[self.segment_id@].is_enabled,
+            local.thread_token.key() == local.thread_id,
+            local.thread_token.instance_id() == local.instance.id(),
             self.wf(),
             self.is_in(*local),
         ensures
-            MemContents::Init(*segment) == local.thread_token@.value.segments.index(self.segment_id@).shared_access.points_to.opt_value(),
+            MemContents::Init(*segment) == local.thread_token.value().segments.index(self.segment_id@).shared_access.points_to.opt_value(),
     {
         let tracked perm = 
             &local.instance.thread_local_state_guards_segment(
@@ -1368,13 +1368,13 @@ impl SegmentPtr {
         requires
             self.wf(), self.is_in(*local),
             //local.wf_main(),
-            local.thread_token@.value.segments.dom().contains(self.segment_id@),
-            local.thread_token@.value.segments[self.segment_id@].shared_access.points_to.ptr() == self.segment_ptr,
-            local.thread_token@.value.segments.index(self.segment_id@).shared_access.points_to.is_init(),
-            local.thread_token@.value.segments[self.segment_id@].is_enabled,
-            local.thread_token@.key == local.thread_id,
-            local.thread_token@.instance == local.instance,
-            local.thread_token@.value.segments.index(self.segment_id@).shared_access.points_to.value().main.id()
+            local.thread_token.value().segments.dom().contains(self.segment_id@),
+            local.thread_token.value().segments[self.segment_id@].shared_access.points_to.ptr() == self.segment_ptr,
+            local.thread_token.value().segments.index(self.segment_id@).shared_access.points_to.is_init(),
+            local.thread_token.value().segments[self.segment_id@].is_enabled,
+            local.thread_token.key() == local.thread_id,
+            local.thread_token.instance_id() == local.instance.id(),
+            local.thread_token.value().segments.index(self.segment_id@).shared_access.points_to.value().main.id()
                 == local.segments[self.segment_id@].main@.pcell,
             local.segments.dom().contains(self.segment_id@),
             local.segments[self.segment_id@].main@.value.is_some(),
@@ -1513,8 +1513,8 @@ impl PagePtr {
     #[verifier(inline)]
     pub open spec fn is_used_and_primary(&self, local: Local) -> bool {
         local.pages.dom().contains(self.page_id@)
-          && local.thread_token@.value.pages.dom().contains(self.page_id@)
-          && local.thread_token@.value.pages[self.page_id@].offset == 0
+          && local.thread_token.value().pages.dom().contains(self.page_id@)
+          && local.thread_token.value().pages[self.page_id@].offset == 0
     }
 
     #[verifier(inline)]
@@ -1525,7 +1525,7 @@ impl PagePtr {
     #[verifier(inline)]
     pub open spec fn is_used(&self, local: Local) -> bool {
         local.pages.dom().contains(self.page_id@)
-          && local.thread_token@.value.pages.dom().contains(self.page_id@)
+          && local.thread_token.value().pages.dom().contains(self.page_id@)
     }
 
     #[inline(always)]
@@ -1552,7 +1552,7 @@ impl PagePtr {
             self.is_in(*local),
         ensures
             !self.is_in_unused(*local) ==>
-              MemContents::Init(*page) == local.thread_token@.value.pages.index(self.page_id@)
+              MemContents::Init(*page) == local.thread_token.value().pages.index(self.page_id@)
                                 .shared_access.points_to.opt_value(),
             self.is_in_unused(*local) ==>
               MemContents::Init(*page) == local.unused_pages[self.page_id@].points_to.opt_value(),

@@ -232,8 +232,8 @@ pub fn page_malloc(
         //const_facts(); 
         //reveal(is_block_ptr);
         local.instance.get_block_properties(
-            local.thread_token@.key,
-            block@.key,
+            local.thread_token.key(),
+            block.key(),
             &local.thread_token,
             &block);
         /*assert(block@.key.slice_idx >= block@.key.page_id.idx);

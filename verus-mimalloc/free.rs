@@ -98,10 +98,10 @@ pub fn free(ptr: *mut u8, Tracked(user_perm): Tracked<PointsToRaw>, Tracked(user
         &segment.thread_id => load();
         returning thread_id_u64;
         ghost g => {
-            if g@.value == local.thread_id {
+            if g.value() == local.thread_id {
                 local.instance.block_on_the_local_thread(
-                    local.thread_token@.key,
-                    dealloc.mim_block@.key,
+                    local.thread_token.key(),
+                    dealloc.mim_block.key(),
                     &local.thread_token,
                     &dealloc.mim_block,
                     &g,
@@ -171,8 +171,8 @@ pub fn free(ptr: *mut u8, Tracked(user_perm): Tracked<PointsToRaw>, Tracked(user
                 let tracked mim_block = dealloc.mim_block;
 
                 //proof {
-                    //assert(mim_block@.key.page_id == page_inner.free.page_id());
-                    //assert(mim_block@.key.block_size == page_inner.free.block_size());
+                    //assert(mim_block.key().page_id == page_inner.free.page_id());
+                    //assert(mim_block.key().block_size == page_inner.free.block_size());
                 //}
 
                 page_inner.free.insert_block(ptr, Tracked(perm), Tracked(mim_block));
@@ -213,7 +213,7 @@ fn free_generic(segment: *mut SegmentHeader, page: PagePtr, is_local: bool, p: *
         page.wf(),
         is_local ==> page.is_in(*old(local)),
         is_local ==> old(local).is_used_primary(page.page_id@),
-        is_local ==> old(local).thread_token@.value.pages[page.page_id@].block_size == dealloc.block_id().block_size,
+        is_local ==> old(local).thread_token.value().pages[page.page_id@].block_size == dealloc.block_id().block_size,
         page.page_id@ == dealloc.block_id().page_id,
     ensures
         local.wf(),
@@ -238,7 +238,7 @@ fn free_block(page: PagePtr, is_local: bool, ptr: *mut u8, Tracked(perm): Tracke
         page.wf(),
         is_local ==> page.is_in(*old(local)),
         is_local ==> old(local).is_used_primary(page.page_id@),
-        is_local ==> old(local).thread_token@.value.pages[page.page_id@].block_size == dealloc.block_id().block_size,
+        is_local ==> old(local).thread_token.value().pages[page.page_id@].block_size == dealloc.block_id().block_size,
         page.page_id@ == dealloc.block_id().page_id,
     ensures
         local.wf(),
@@ -250,8 +250,8 @@ fn free_block(page: PagePtr, is_local: bool, ptr: *mut u8, Tracked(perm): Tracke
             let tracked mim_block = dealloc.mim_block;
 
             //proof {
-            //    assert(mim_block@.key.page_id == page_inner.free.page_id());
-            //    assert(mim_block@.key.block_size == page_inner.free.block_size());
+            //    assert(mim_block.key().page_id == page_inner.free.page_id());
+            //    assert(mim_block.key().block_size == page_inner.free.block_size());
             //}
 
             page_inner.free.insert_block(ptr, Tracked(perm), Tracked(mim_block));
@@ -318,7 +318,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
             common_preserves(*old(local), *local),
 
             //*page == 
-            //    dealloc.mim_block@.value.page_shared_access.points_to@.value.get_Some_0(),
+            //    dealloc.mim_block.value().page_shared_access.points_to@.value.get_Some_0(),
         //ensures
         //    use_delayed ==> (match delay_actor_token_opt {
         //        None => false,
@@ -337,7 +337,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
         let mask = atomic_with_ghost!(&pag.xthread_free.atomic => load(); ghost g => {
             pag.xthread_free.emp_inst.borrow().agree(pag.xthread_free.emp.borrow(), &g.0);
             next_ptr = g.1.unwrap().1.ptr();
-            delay = g.1.unwrap().0.view().value; // TODO fix macro syntax in atomic_with_ghost
+            delay = g.1.unwrap().0.value(); // TODO fix macro syntax in atomic_with_ghost
         });
 
         use_delayed = masked_ptr_delay_get_is_use_delayed(mask, Ghost(delay), Ghost(next_ptr));
@@ -472,7 +472,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
                             g.1.tracked_borrow(),
                             delay_actor_token);
                         delay_actor_token = tok;
-                        heap_id = g.1.unwrap().view().value;
+                        heap_id = g.1.unwrap().value();
                     });
 
                     let tracked heap_shared_access: &HeapSharedAccess;
@@ -487,7 +487,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
                         Tracked(&heap_shared_access.points_to));
 
                     let tracked mim_block = mim_block_opt.tracked_unwrap();
-                    let tracked mim_block = local.instance.block_set_heap_id(mim_block@.key,
+                    let tracked mim_block = local.instance.block_set_heap_id(mim_block.key(),
                         mim_block, &delay_actor_token);
                     heap.thread_delayed_free.atomic_insert_block(ptr, Tracked(perm), Tracked(mim_block));
 
@@ -542,14 +542,14 @@ pub fn free_delayed_block(ptr: *mut u8,
         perm.provenance() == ptr@.provenance,
         ptr == dealloc.ptr,
         old(local).instance == dealloc.mim_instance,
-        dealloc.mim_block@.value.heap_id == Some(old(local).thread_token@.value.heap_id),
+        dealloc.mim_block.value().heap_id == Some(old(local).thread_token.value().heap_id),
     ensures
         local.wf(),
         common_preserves(*old(local), *local),
         !res.0 ==> res.1@ == Some(perm),
         !res.0 ==> res.2@ == Some(dealloc),
 {
-    let ghost block_id = dealloc.mim_block@.key;
+    let ghost block_id = dealloc.mim_block.key();
     let segment = crate::layout::calculate_segment_ptr_from_block(ptr, Ghost(block_id));
 
     let slice_page_ptr = crate::layout::calculate_slice_page_ptr_from_block(ptr, segment, Ghost(block_id));
@@ -574,14 +574,14 @@ pub fn free_delayed_block(ptr: *mut u8,
     let page = PagePtr { page_ptr: page_ptr, page_id: Ghost(block_id.page_id) };
     proof {
         local.instance.block_in_heap_has_valid_page(
-            local.thread_token@.key,
-            dealloc.mim_block@.key,
+            local.thread_token.key(),
+            dealloc.mim_block.key(),
             &local.thread_token,
             &dealloc.mim_block);
     }
     //assert(page.is_in(*local));
     //assert(page.is_used_and_primary(*local));
-    //assert(local.thread_token@.value.pages[page.page_id@].block_size == dealloc.block_id().block_size);
+    //assert(local.thread_token.value().pages[page.page_id@].block_size == dealloc.block_id().block_size);
 
     if !crate::page::page_try_use_delayed_free(page, 0, false, Tracked(&*local)) {
         return (false, Tracked(Some(perm)), Tracked(Some(dealloc)));
@@ -589,7 +589,7 @@ pub fn free_delayed_block(ptr: *mut u8,
 
     crate::alloc_generic::page_free_collect(page, false, Tracked(&mut *local));
 
-    //assert(local.thread_token@.value.pages[page.page_id@].block_size == dealloc.block_id().block_size);
+    //assert(local.thread_token.value().pages[page.page_id@].block_size == dealloc.block_id().block_size);
 
     crate::free::free_block(page, true, ptr,
         Tracked(perm), Tracked(dealloc), Tracked(&mut *local));

@@ -53,7 +53,7 @@ You will probably see a lot of information about which functions are taking a lo
 but you can ignore this unless you see an actual error.
 At the end you should see something like "743 verified, 0 errors" (or some other large number).
 
-Last tested with Verus edf796ac8be6ee3ab499a0f79cec79425630e5c3
+Last tested with Verus 43af0c8df847cc25de2291fffb51c09262c9247d
 
 ### Benchmarking
 

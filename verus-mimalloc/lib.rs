@@ -65,16 +65,16 @@ fn main() {
         let tracked mut local = local.tracked_unwrap();
 
         let (p1, u1, Tracked(d1)) = crate::alloc_fast::heap_malloc(heap, 24, Tracked(&mut local));
-        print_hex(vstd::string::new_strlit("allocated: "), p1.addr());
+        print_hex("allocated: ", p1.addr());
 
         let (p2, u2, Tracked(d2)) = crate::alloc_fast::heap_malloc(heap, 24, Tracked(&mut local));
-        print_hex(vstd::string::new_strlit("allocated: "), p2.addr());
+        print_hex("allocated: ", p2.addr());
 
         let (p3, u3, Tracked(d3)) = crate::alloc_fast::heap_malloc(heap, 24, Tracked(&mut local));
-        print_hex(vstd::string::new_strlit("allocated: "), p3.addr());
+        print_hex("allocated: ", p3.addr());
 
         let (p4, u4, Tracked(d4)) = crate::alloc_fast::heap_malloc(heap, 24, Tracked(&mut local));
-        print_hex(vstd::string::new_strlit("allocated: "), p4.addr());
+        print_hex("allocated: ", p4.addr());
 
         crate::free::free(p1, u1, Tracked(Some(d1)), Tracked(&mut local));
         crate::free::free(p2, u2, Tracked(Some(d2)), Tracked(&mut local));
@@ -82,7 +82,7 @@ fn main() {
         crate::free::free(p4, u4, Tracked(Some(d4)), Tracked(&mut local));
 
         let (p5, u5, Tracked(d5)) = crate::alloc_fast::heap_malloc(heap, 24, Tracked(&mut local));
-        print_hex(vstd::string::new_strlit("allocated: "), p5.addr());
+        print_hex("allocated: ", p5.addr());
 
         crate::free::free(p5, u5, Tracked(Some(d5)), Tracked(&mut local));
     }

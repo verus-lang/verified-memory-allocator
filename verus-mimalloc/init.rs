@@ -242,8 +242,8 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
 
     proof {
         let emp = local.page_empty_global@.s.points_to.ptr();
-        let pfd = local.heap.pages_free_direct@.value.unwrap()@;
-        let pages = local.heap.pages@.value.unwrap()@;
+        let pfd = local.heap.pages_free_direct.value()@;
+        let pages = local.heap.pages.value()@;
         assert forall |wsize|
           0 <= wsize < pfd.len() implies
             pages_free_direct_match(
@@ -257,8 +257,8 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
         }
 
         assert(pages_free_direct_is_correct(
-            local.heap.pages_free_direct@.value.unwrap()@,
-            local.heap.pages@.value.unwrap()@,
+            local.heap.pages_free_direct.value()@,
+            local.heap.pages.value()@,
             emp));
         assert(local.heap.wf_basic(local.heap_id, local.thread_token.value().heap, local.tld_id, local.instance.id()));
         assert(local.heap.wf(local.heap_id, local.thread_token.value().heap, local.tld_id, local.instance.id(), local.page_empty_global@.s.points_to.ptr()));

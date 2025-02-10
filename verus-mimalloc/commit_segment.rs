@@ -239,8 +239,8 @@ fn segment_commitx(
     });
     
     proof {
-        let cm = local.segments[sid].main@.value.unwrap().commit_mask@;
-        let old_cm = old(local).segments[sid].main@.value.unwrap().commit_mask@;
+        let cm = local.segments[sid].main.value().commit_mask@;
+        let old_cm = old(local).segments[sid].main.value().commit_mask@;
 
         if commit {
             assert(local.decommit_mask(sid).bytes(sid).subset_of( old(local).decommit_mask(sid).bytes(sid) ) && old(local).commit_mask(sid).bytes(sid).subset_of( local.commit_mask(sid).bytes(sid) )) by { reveal(CommitMask::bytes); }

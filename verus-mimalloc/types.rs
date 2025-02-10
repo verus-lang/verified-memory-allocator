@@ -305,13 +305,13 @@ impl PageLocalAccess {
 
         && match page_state.shared_access.points_to.opt_value() {
             MemContents::Init(page) => {
-                &&& self.inner@.pcell == page.inner.id()
-                &&& self.count@.pcell == page.count.id()
-                &&& self.prev@.pcell == page.prev.id()
-                &&& self.next@.pcell == page.next.id()
+                &&& self.inner.id() == page.inner.id()
+                &&& self.count.id() == page.count.id()
+                &&& self.prev.id() == page.prev.id()
+                &&& self.next.id() == page.next.id()
 
-                &&& match (self.count@.value, self.inner@.value, self.prev@.value, self.next@.value) {
-                    (Some(count), Some(page_inner), Some(prev), Some(next)) => {
+                &&& match (self.count.mem_contents(), self.inner.mem_contents(), self.prev.mem_contents(), self.next.mem_contents()) {
+                    (MemContents::Init(count), MemContents::Init(page_inner), MemContents::Init(prev), MemContents::Init(next)) => {
                         //&&& is_page_ptr_opt(prev, page_state.prev)
                         //&&& is_page_ptr_opt(next, page_state.next)
 
@@ -334,13 +334,13 @@ impl PageLocalAccess {
 
         && match shared_access.points_to.opt_value() {
             MemContents::Init(page) => {
-                &&& self.count@.pcell == page.count.id()
-                &&& self.inner@.pcell == page.inner.id()
-                &&& self.prev@.pcell == page.prev.id()
-                &&& self.next@.pcell == page.next.id()
+                &&& self.count.id() == page.count.id()
+                &&& self.inner.id() == page.inner.id()
+                &&& self.prev.id() == page.prev.id()
+                &&& self.next.id() == page.next.id()
 
-                &&& match self.inner@.value {
-                    Some(page_inner) => {
+                &&& match self.inner.mem_contents() {
+                    MemContents::Init(page_inner) => {
                         page_inner.zeroed_except_block_size()
                         /*&& (
                             && page_id.idx != 0 && (popped != Popped::Ready(page_id) &&
@@ -360,11 +360,11 @@ impl PageLocalAccess {
 impl PageFullAccess {
     pub open spec fn wf_empty_page_global(&self) -> bool {
         &&& self.s.points_to.is_init()
-        &&& self.s.points_to.value().inner.id() == self.l.inner@.pcell
+        &&& self.s.points_to.value().inner.id() == self.l.inner.id()
         &&& self.s.exposed.provenance() == self.s.points_to.ptr()@.provenance
         &&& self.s.points_to.ptr()@.metadata == Metadata::Thin
-        &&& self.l.inner@.value.is_some()
-        &&& self.l.inner@.value.unwrap().zeroed()
+        &&& self.l.inner.is_init()
+        &&& self.l.inner.value().zeroed()
     }
 }
 
@@ -459,11 +459,11 @@ pub tracked struct SegmentLocalAccess {
 impl SegmentLocalAccess {
     pub open spec fn wf(&self, segment_id: SegmentId, segment_state: SegmentState, mim_instance: Mim::Instance) -> bool {
         &&& segment_state.shared_access.wf(segment_id, mim_instance)
-        &&& segment_state.shared_access.points_to.value().main.id() == self.main@.pcell
-        &&& self.main@.value.is_some()
+        &&& segment_state.shared_access.points_to.value().main.id() == self.main.id()
+        &&& self.main.is_init()
 
-        &&& segment_state.shared_access.points_to.value().main2.id() == self.main2@.pcell
-        &&& self.main2@.value.is_some()
+        &&& segment_state.shared_access.points_to.value().main2.id() == self.main2.id()
+        &&& self.main2.is_init()
 
         &&& segment_state.is_enabled
     }
@@ -568,8 +568,8 @@ impl HeapLocalAccess {
 
         self.wf_basic(heap_id, heap_state, tld_id, mim_instance)
           && pages_free_direct_is_correct(
-                self.pages_free_direct@.value.unwrap()@,
-                self.pages@.value.unwrap()@,
+                self.pages_free_direct.value()@,
+                self.pages.value()@,
                 emp)
           && heap_state.shared_access.points_to.value().page_empty_ptr == emp
     }
@@ -578,26 +578,26 @@ impl HeapLocalAccess {
       heap_state.shared_access.wf(heap_id, tld_id, mim_instance)
         && {
             let heap = heap_state.shared_access.points_to.value();
-              heap.pages_free_direct.id() == self.pages_free_direct@.pcell
-              && heap.pages.id() == self.pages@.pcell
-              && heap.page_count.id() == self.page_count@.pcell
-              && heap.page_retired_min.id() == self.page_retired_min@.pcell
-              && heap.page_retired_max.id() == self.page_retired_max@.pcell
-              && self.pages_free_direct@.value.is_some()
-              && self.pages@.value.is_some()
-              && self.page_count@.value.is_some()
-              && self.page_retired_min@.value.is_some()
-              && self.page_retired_max@.value.is_some()
+              heap.pages_free_direct.id() == self.pages_free_direct.id()
+              && heap.pages.id() == self.pages.id()
+              && heap.page_count.id() == self.page_count.id()
+              && heap.page_retired_min.id() == self.page_retired_min.id()
+              && heap.page_retired_max.id() == self.page_retired_max.id()
+              && self.pages_free_direct.is_init()
+              && self.pages.is_init()
+              && self.page_count.is_init()
+              && self.page_retired_min.is_init()
+              && self.page_retired_max.is_init()
 
               && (forall |i: int| #[trigger] valid_bin_idx(i) ==>
-                  self.pages@.value.unwrap()[i].block_size == size_of_bin(i))
+                  self.pages.value()[i].block_size == size_of_bin(i))
               // 0 isn't a valid_bin_idx
-              && self.pages@.value.unwrap()[0].block_size == 8
-              && self.pages@.value.unwrap()[BIN_FULL as int].block_size == 
+              && self.pages.value()[0].block_size == 8
+              && self.pages.value()[BIN_FULL as int].block_size == 
                     8 * (524288 + 2) //MEDIUM_OBJ_WSIZE_MAX + 2
 
-              && self.pages_free_direct@.value.unwrap()@.len() == PAGES_DIRECT
-              && self.pages@.value.unwrap()@.len() == BIN_FULL + 1
+              && self.pages_free_direct.value()@.len() == PAGES_DIRECT
+              && self.pages.value()@.len() == BIN_FULL + 1
         }
     }
 }
@@ -773,7 +773,7 @@ impl Local {
                 self.tld.value().segments.span_queue_headers@)
 
         &&& page_organization_used_queues_match(self.page_organization.used_dlist_headers,
-                self.heap.pages@.value.unwrap()@)
+                self.heap.pages.value()@)
 
         &&& page_organization_pages_match(self.page_organization.pages,
                 self.pages, self.psa, self.page_organization.popped)
@@ -815,9 +815,9 @@ impl Local {
     pub open spec fn page_inner(&self, page_id: PageId) -> PageInner
         recommends
             self.pages.dom().contains(page_id),
-            self.pages.index(page_id).inner@.value.is_Some(),
+            self.pages.index(page_id).inner.is_init(),
     {
-        self.pages.index(page_id).inner@.value.get_Some_0()
+        self.pages.index(page_id).inner.value()
     }
 
 
@@ -849,11 +849,11 @@ impl Local {
     }
 
     pub open spec fn commit_mask(&self, segment_id: SegmentId) -> CommitMask {
-        self.segments[segment_id].main@.value.unwrap().commit_mask
+        self.segments[segment_id].main.value().commit_mask
     }
 
     pub open spec fn decommit_mask(&self, segment_id: SegmentId) -> CommitMask {
-        self.segments[segment_id].main@.value.unwrap().decommit_mask
+        self.segments[segment_id].main.value().decommit_mask
     }
 
     pub open spec fn is_used_primary(&self, page_id: PageId) -> bool {
@@ -863,19 +863,19 @@ impl Local {
     }
 
     pub open spec fn page_reserved(&self, page_id: PageId) -> int {
-        self.pages[page_id].inner@.value.unwrap().reserved as int
+        self.pages[page_id].inner.value().reserved as int
     }
 
     pub open spec fn page_count(&self, page_id: PageId) -> int {
-        self.pages[page_id].count@.value.unwrap() as int
+        self.pages[page_id].count.value() as int
     }
 
     pub open spec fn page_capacity(&self, page_id: PageId) -> int {
-        self.pages[page_id].inner@.value.unwrap().capacity as int
+        self.pages[page_id].inner.value().capacity as int
     }
 
     pub open spec fn block_size(&self, page_id: PageId) -> int {
-        self.pages[page_id].inner@.value.unwrap().xblock_size as int
+        self.pages[page_id].inner.value().xblock_size as int
     }
 }
 
@@ -929,8 +929,8 @@ pub open spec fn page_organization_pages_match_data(
     popped: Popped) -> bool
 {
     psa.points_to.is_init() && (
-    match (pla.count@.value, pla.inner@.value, pla.prev@.value, pla.next@.value) {
-        (Some(count), Some(inner), Some(prev), Some(next)) => {
+    match (pla.count.mem_contents(), pla.inner.mem_contents(), pla.prev.mem_contents(), pla.next.mem_contents()) {
+        (MemContents::Init(count), MemContents::Init(inner), MemContents::Init(prev), MemContents::Init(next)) => {
             &&& (match page_data.count {
                 None => true,
                 Some(c) => count as int == c
@@ -989,7 +989,7 @@ pub open spec fn page_organization_segments_match(
 ) -> bool {
     org_segments.dom() =~= segments.dom()
     && (forall |segment_id: SegmentId| segments.dom().contains(segment_id) ==>
-        org_segments[segment_id].used == segments[segment_id].main2@.value.unwrap().used)
+        org_segments[segment_id].used == segments[segment_id].main2.value().used)
 }
 
 pub open spec fn page_organization_matches_token_page(
@@ -1061,7 +1061,7 @@ impl HeapPtr {
             self.wf(),
             self.is_in(*local),
         ensures
-            Some(*pages) == local.heap.pages@.value
+            MemContents::Init(*pages) == local.heap.pages.mem_contents()
     {
         self.get_ref(Tracked(local)).pages.borrow(Tracked(&local.heap.pages))
     }
@@ -1073,7 +1073,7 @@ impl HeapPtr {
             self.wf(),
             self.is_in(*local),
         ensures
-            Some(page_count) == local.heap.page_count@.value
+            MemContents::Init(page_count) == local.heap.page_count.mem_contents()
     {
         *self.get_ref(Tracked(local)).page_count.borrow(Tracked(&local.heap.page_count))
     }
@@ -1101,7 +1101,7 @@ impl HeapPtr {
             self.wf(),
             self.is_in(*local),
         ensures
-            Some(page_retired_min) == local.heap.page_retired_min@.value
+            MemContents::Init(page_retired_min) == local.heap.page_retired_min.mem_contents()
     {
         *self.get_ref(Tracked(local)).page_retired_min.borrow(Tracked(&local.heap.page_retired_min))
     }
@@ -1129,7 +1129,7 @@ impl HeapPtr {
             self.wf(),
             self.is_in(*local),
         ensures
-            Some(page_retired_max) == local.heap.page_retired_max@.value
+            MemContents::Init(page_retired_max) == local.heap.page_retired_max.mem_contents()
     {
         *self.get_ref(Tracked(local)).page_retired_max.borrow(Tracked(&local.heap.page_retired_max))
     }
@@ -1157,7 +1157,7 @@ impl HeapPtr {
             self.wf(),
             self.is_in(*local),
         ensures
-            Some(*pages) == local.heap.pages_free_direct@.value
+            MemContents::Init(*pages) == local.heap.pages_free_direct.mem_contents()
     {
         self.get_ref(Tracked(local)).pages_free_direct.borrow(Tracked(&local.heap.pages_free_direct))
     }
@@ -1199,25 +1199,25 @@ impl HeapPtr {
 pub open spec fn local_page_count_update(loc1: Local, loc2: Local) -> bool {
     &&& loc2 == Local { heap: loc2.heap, .. loc1 }
     &&& loc2.heap == HeapLocalAccess { page_count: loc2.heap.page_count, .. loc1.heap }
-    &&& loc1.heap.page_count@.pcell == loc2.heap.page_count@.pcell
-    &&& loc1.heap.page_count@.value.is_some()
-    &&& loc2.heap.page_count@.value.is_some()
+    &&& loc1.heap.page_count.id() == loc2.heap.page_count.id()
+    &&& loc1.heap.page_count.is_init()
+    &&& loc2.heap.page_count.is_init()
 }
 
 pub open spec fn local_page_retired_min_update(loc1: Local, loc2: Local) -> bool {
     &&& loc2 == Local { heap: loc2.heap, .. loc1 }
     &&& loc2.heap == HeapLocalAccess { page_retired_min: loc2.heap.page_retired_min, .. loc1.heap }
-    &&& loc1.heap.page_retired_min@.pcell == loc2.heap.page_retired_min@.pcell
-    &&& loc1.heap.page_retired_min@.value.is_some()
-    &&& loc2.heap.page_retired_min@.value.is_some()
+    &&& loc1.heap.page_retired_min.id() == loc2.heap.page_retired_min.id()
+    &&& loc1.heap.page_retired_min.is_init()
+    &&& loc2.heap.page_retired_min.is_init()
 }
 
 pub open spec fn local_page_retired_max_update(loc1: Local, loc2: Local) -> bool {
     &&& loc2 == Local { heap: loc2.heap, .. loc1 }
     &&& loc2.heap == HeapLocalAccess { page_retired_max: loc2.heap.page_retired_max, .. loc1.heap }
-    &&& loc1.heap.page_retired_max@.pcell == loc2.heap.page_retired_max@.pcell
-    &&& loc1.heap.page_retired_max@.value.is_some()
-    &&& loc2.heap.page_retired_max@.value.is_some()
+    &&& loc1.heap.page_retired_max.id() == loc2.heap.page_retired_max.id()
+    &&& loc1.heap.page_retired_max.is_init()
+    &&& loc2.heap.page_retired_max.is_init()
 }
 
 
@@ -1375,10 +1375,10 @@ impl SegmentPtr {
             local.thread_token.key() == local.thread_id,
             local.thread_token.instance_id() == local.instance.id(),
             local.thread_token.value().segments.index(self.segment_id@).shared_access.points_to.value().main.id()
-                == local.segments[self.segment_id@].main@.pcell,
+                == local.segments[self.segment_id@].main.id(),
             local.segments.dom().contains(self.segment_id@),
-            local.segments[self.segment_id@].main@.value.is_some(),
-        ensures Some(*segment_header_main) == local.segments.index(self.segment_id@).main@.value
+            local.segments[self.segment_id@].main.is_init(),
+        ensures MemContents::Init(*segment_header_main) == local.segments.index(self.segment_id@).main.mem_contents()
     {
         let segment = self.get_ref(Tracked(local));
         segment.main.borrow(Tracked(&local.segments.tracked_borrow(self.segment_id@).main))
@@ -1387,7 +1387,7 @@ impl SegmentPtr {
     #[inline(always)]
     pub fn get_main2_ref<'a>(&self, Tracked(local): Tracked<&'a Local>) -> (segment_header_main2: &'a SegmentHeaderMain2)
         requires local.wf_main(), self.wf(), self.is_in(*local),
-        ensures Some(*segment_header_main2) == local.segments.index(self.segment_id@).main2@.value
+        ensures MemContents::Init(*segment_header_main2) == local.segments.index(self.segment_id@).main2.mem_contents()
     {
         let segment = self.get_ref(Tracked(local));
         segment.main2.borrow(Tracked(&local.segments.tracked_borrow(self.segment_id@).main2))
@@ -1397,7 +1397,7 @@ impl SegmentPtr {
     pub fn get_commit_mask<'a>(&self, Tracked(local): Tracked<&'a Local>) -> (cm: &'a CommitMask)
         requires self.wf(), self.is_in(*local),
             local.wf_main(),
-        ensures cm == local.segments[self.segment_id@].main@.value.unwrap().commit_mask
+        ensures cm == local.segments[self.segment_id@].main.value().commit_mask
     {
         &self.get_main_ref(Tracked(local)).commit_mask
     }
@@ -1406,7 +1406,7 @@ impl SegmentPtr {
     pub fn get_decommit_mask<'a>(&self, Tracked(local): Tracked<&'a Local>) -> (cm: &'a CommitMask)
         requires self.wf(), self.is_in(*local),
             local.wf_main(),
-        ensures cm == local.segments[self.segment_id@].main@.value.unwrap().decommit_mask
+        ensures cm == local.segments[self.segment_id@].main.value().decommit_mask
     {
         &self.get_main_ref(Tracked(local)).decommit_mask
     }
@@ -1415,7 +1415,7 @@ impl SegmentPtr {
     pub fn get_decommit_expire(&self, Tracked(local): Tracked<&Local>) -> (i: i64)
         requires self.wf(), self.is_in(*local),
             local.wf_main(),
-        ensures i == local.segments[self.segment_id@].main@.value.unwrap().decommit_expire
+        ensures i == local.segments[self.segment_id@].main.value().decommit_expire
     {
         self.get_main_ref(Tracked(local)).decommit_expire
     }
@@ -1425,7 +1425,7 @@ impl SegmentPtr {
     pub fn get_allow_decommit(&self, Tracked(local): Tracked<&Local>) -> (b: bool)
         requires self.wf(), self.is_in(*local),
             local.wf_main(),
-        ensures b == local.segments[self.segment_id@].main@.value.unwrap().allow_decommit
+        ensures b == local.segments[self.segment_id@].main.value().allow_decommit
     {
         self.get_main_ref(Tracked(local)).allow_decommit
     }
@@ -1433,7 +1433,7 @@ impl SegmentPtr {
     #[inline(always)]
     pub fn get_used(&self, Tracked(local): Tracked<&Local>) -> (used: usize)
         requires self.wf(), self.is_in(*local), local.wf_main(),
-        ensures used == local.segments[self.segment_id@].main2@.value.unwrap().used,
+        ensures used == local.segments[self.segment_id@].main2.value().used,
     {
         self.get_main2_ref(Tracked(local)).used
     }
@@ -1441,7 +1441,7 @@ impl SegmentPtr {
     #[inline(always)]
     pub fn get_abandoned(&self, Tracked(local): Tracked<&Local>) -> (abandoned: usize)
         requires self.wf(), self.is_in(*local), local.wf_main(),
-        ensures abandoned == local.segments[self.segment_id@].main2@.value.unwrap().abandoned,
+        ensures abandoned == local.segments[self.segment_id@].main2.value().abandoned,
     {
         self.get_main2_ref(Tracked(local)).abandoned
     }
@@ -1449,7 +1449,7 @@ impl SegmentPtr {
     #[inline(always)]
     pub fn get_mem_is_pinned(&self, Tracked(local): Tracked<&Local>) -> (mem_is_pinned: bool)
         requires self.wf(), self.is_in(*local), local.wf_main(),
-        ensures mem_is_pinned == local.segments[self.segment_id@].main@.value.unwrap().mem_is_pinned,
+        ensures mem_is_pinned == local.segments[self.segment_id@].main.value().mem_is_pinned,
     {
         self.get_main_ref(Tracked(local)).mem_is_pinned
     }
@@ -1464,7 +1464,7 @@ impl SegmentPtr {
     #[inline(always)]
     pub fn get_segment_kind(&self, Tracked(local): Tracked<&Local>) -> (kind: SegmentKind)
         requires self.wf(), self.is_in(*local), local.wf_main(),
-        ensures kind == local.segments[self.segment_id@].main2@.value.unwrap().kind,
+        ensures kind == local.segments[self.segment_id@].main2.value().kind,
     {
         self.get_main2_ref(Tracked(local)).kind
     }
@@ -1472,7 +1472,7 @@ impl SegmentPtr {
     #[inline(always)]
     pub fn is_kind_huge(&self, Tracked(local): Tracked<&Local>) -> (b: bool)
         requires self.wf(), self.is_in(*local), local.wf_main(),
-        ensures b == (local.segments[self.segment_id@].main2@.value.unwrap().kind == SegmentKind::Huge)
+        ensures b == (local.segments[self.segment_id@].main2.value().kind == SegmentKind::Huge)
     {
         let kind = self.get_main2_ref(Tracked(local)).kind;
         matches!(kind, SegmentKind::Huge)
@@ -1574,7 +1574,7 @@ impl PagePtr {
             self.wf(),
             self.is_in(*local),
         ensures
-            Some(*page_inner) == local.pages.index(self.page_id@).inner@.value
+            MemContents::Init(*page_inner) == local.pages.index(self.page_id@).inner.mem_contents()
     {
         let page = self.get_ref(Tracked(local));
         page.inner.borrow(Tracked(
@@ -1591,10 +1591,10 @@ impl PagePtr {
             )
         ensures
             !self.is_empty_global(*local) ==> (
-                Some(*page_inner) == local.pages.index(self.page_id@).inner@.value
+                MemContents::Init(*page_inner) == local.pages.index(self.page_id@).inner.mem_contents()
             ),
             self.is_empty_global(*local) ==> (
-                Some(*page_inner) == local.page_empty_global@.l.inner@.value
+                MemContents::Init(*page_inner) == local.page_empty_global@.l.inner.mem_contents()
             ),
     {
         let tracked perm = if self.is_empty_global(*local) {
@@ -1622,7 +1622,7 @@ impl PagePtr {
             self.wf(),
             self.is_in(*local),
         ensures
-            Some(count) == local.pages.index(self.page_id@).count@.value
+            MemContents::Init(count) == local.pages.index(self.page_id@).count.mem_contents()
     {
         let page = self.get_ref(Tracked(local));
         *page.count.borrow(Tracked(
@@ -1637,7 +1637,7 @@ impl PagePtr {
             self.wf(),
             self.is_in(*local),
         ensures
-            Some(next) == local.pages.index(self.page_id@).next@.value
+            MemContents::Init(next) == local.pages.index(self.page_id@).next.mem_contents()
     {
         let page = self.get_ref(Tracked(local));
         *page.next.borrow(Tracked(
@@ -1652,7 +1652,7 @@ impl PagePtr {
             self.wf(),
             self.is_in(*local),
         ensures
-            Some(prev) == local.pages.index(self.page_id@).prev@.value
+            MemContents::Init(prev) == local.pages.index(self.page_id@).prev.mem_contents()
     {
         let page = self.get_ref(Tracked(local));
         *page.prev.borrow(Tracked(
@@ -1799,7 +1799,7 @@ impl PagePtr {
             self.wf(),
             self.is_in(*local),
         ensures
-            bsize == local.pages.index(self.page_id@).inner@.value.unwrap().xblock_size
+            bsize == local.pages.index(self.page_id@).inner.value().xblock_size
     {
         self.get_inner_ref(Tracked(local)).xblock_size
     }

@@ -1107,21 +1107,21 @@ fn segment_alloc(
                 page_id.segment_id == segment_id && 0 <= page_id.idx < i ==> {
                     &&& psa_map.dom().contains(page_id)
                     &&& pla_map.dom().contains(page_id)
-                    &&& pla_map[page_id].inner@.value.is_some()
-                    &&& pla_map[page_id].count@.value.is_some()
-                    &&& pla_map[page_id].prev@.value.is_some()
-                    &&& pla_map[page_id].next@.value.is_some()
-                    &&& pla_map[page_id].inner@.value.unwrap().zeroed()
-                    &&& pla_map[page_id].count@.value.unwrap() == 0
-                    &&& pla_map[page_id].prev@.value.unwrap() as int == 0
-                    &&& pla_map[page_id].next@.value.unwrap() as int == 0
+                    &&& pla_map[page_id].inner.is_init()
+                    &&& pla_map[page_id].count.is_init()
+                    &&& pla_map[page_id].prev.is_init()
+                    &&& pla_map[page_id].next.is_init()
+                    &&& pla_map[page_id].inner.value().zeroed()
+                    &&& pla_map[page_id].count.value() == 0
+                    &&& pla_map[page_id].prev.value() as int == 0
+                    &&& pla_map[page_id].next.value() as int == 0
 
                     &&& is_page_ptr(psa_map[page_id].points_to.ptr(), page_id)
                     &&& psa_map[page_id].points_to.is_init()
-                    &&& psa_map[page_id].points_to.value().count.id() == pla_map[page_id].count@.pcell
-                    &&& psa_map[page_id].points_to.value().inner.id() == pla_map[page_id].inner@.pcell
-                    &&& psa_map[page_id].points_to.value().prev.id() == pla_map[page_id].prev@.pcell
-                    &&& psa_map[page_id].points_to.value().next.id() == pla_map[page_id].next@.pcell
+                    &&& psa_map[page_id].points_to.value().count.id() == pla_map[page_id].count.id()
+                    &&& psa_map[page_id].points_to.value().inner.id() == pla_map[page_id].inner.id()
+                    &&& psa_map[page_id].points_to.value().prev.id() == pla_map[page_id].prev.id()
+                    &&& psa_map[page_id].points_to.value().next.id() == pla_map[page_id].next.id()
                     &&& psa_map[page_id].points_to.ptr()@.provenance == psa_map[page_id].exposed.provenance()
                     &&& psa_map[page_id].points_to.value().offset == 0
                     &&& psa_map[page_id].points_to.value().xthread_free.is_empty()
@@ -1209,10 +1209,10 @@ fn segment_alloc(
 
         assert( is_page_ptr(psa_map[page_id].points_to@.pptr, page_id));
         assert( psa_map[page_id].points_to.is_init());
-        assert( psa_map[page_id].points_to.value().count.id() == pla_map[page_id].count@.pcell);
-        assert( psa_map[page_id].points_to.value().inner.id() == pla_map[page_id].inner@.pcell);
-        assert( psa_map[page_id].points_to.value().prev.id() == pla_map[page_id].prev@.pcell);
-        assert( psa_map[page_id].points_to.value().next.id() == pla_map[page_id].next@.pcell);
+        assert( psa_map[page_id].points_to.value().count.id() == pla_map[page_id].count.id());
+        assert( psa_map[page_id].points_to.value().inner.id() == pla_map[page_id].inner.id());
+        assert( psa_map[page_id].points_to.value().prev.id() == pla_map[page_id].prev.id());
+        assert( psa_map[page_id].points_to.value().next.id() == pla_map[page_id].next.id());
         assert( psa_map[page_id].points_to.value().offset == 0);
         assert( psa_map[page_id].points_to.value().xthread_free.is_empty());
         assert( psa_map[page_id].points_to.value().xheap.is_empty());*/
@@ -1773,7 +1773,7 @@ pub fn segment_page_free(page: PagePtr, force: bool, tld: TldPtr, Tracked(local)
         page.wf(),
         page.is_in(*old(local)),
         old(local).page_organization.popped == Popped::Used(page.page_id@, true),
-        old(local).pages[page.page_id@].inner@.value.unwrap().used == 0,
+        old(local).pages[page.page_id@].inner.value().used == 0,
     ensures
         local.wf(),
         common_preserves(*old(local), *local),
@@ -1798,7 +1798,7 @@ fn segment_page_clear(page: PagePtr, tld: TldPtr, Tracked(local): Tracked<&mut L
         page.wf(),
         page.is_in(*old(local)),
         old(local).page_organization.popped == Popped::Used(page.page_id@, true),
-        old(local).pages[page.page_id@].inner@.value.unwrap().used == 0,
+        old(local).pages[page.page_id@].inner.value().used == 0,
     ensures
         local.wf(),
         page.is_in(*local),
@@ -2018,7 +2018,7 @@ fn segment_span_free_coalesce(slice: PagePtr, tld: TldPtr, Tracked(local): Track
         match old(local).page_organization.popped {
             Popped::VeryUnready(sid, idx, c, _) => slice.page_id@.segment_id == sid
                 && slice.page_id@.idx == idx
-                && c == old(local).pages[slice.page_id@].count@.value.unwrap(),
+                && c == old(local).pages[slice.page_id@].count.value(),
             _ => false,
         },
     ensures
@@ -2263,7 +2263,7 @@ fn segment_span_free_coalesce_before(segment: SegmentPtr, slice: PagePtr, tld: T
                 //assert(
                 //  old(local).pages.index(orig_id).wf_unused(orig_id, old(local).unused_pages[orig_id], old(local).page_organization.popped, local.instance)
                 //);
-                //assert(local.pages.index(orig_id).inner@.value.unwrap().zeroed_except_block_size());
+                //assert(local.pages.index(orig_id).inner.value().zeroed_except_block_size());
                 //assert(
                 //  local.pages.index(orig_id).wf_unused(orig_id, local.unused_pages[orig_id], local.page_organization.popped, local.instance)
                 //);

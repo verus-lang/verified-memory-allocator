@@ -961,8 +961,8 @@ pub proof fn segment_mem_has_reserved_range(local: Local, page_id: PageId, new_c
             assert(p_capacity * p_blocksize <= p_reserved * p_blocksize) by(nonlinear_arith)
                 requires p_capacity <= p_reserved, p_blocksize >= 0;
 
-            let my_count = local.pages[page_id].count@.value.unwrap() as int;
-            let p_count = local.pages[pid].count@.value.unwrap() as int;
+            let my_count = local.pages[page_id].count.value() as int;
+            let p_count = local.pages[pid].count.value() as int;
 
             local.page_organization.lemma_range_disjoint_used2(page_id, pid);
             assert(page_id.idx + my_count <= pid.idx
@@ -984,7 +984,7 @@ pub open spec fn page_init_is_committed(page_id: PageId, local: Local) -> bool {
     let count = local.page_organization.pages[page_id].count.unwrap() as int;
     let start = page_start(page_id);
     let len = count * SLICE_SIZE;
-    let cm = local.segments[page_id.segment_id].main@.value.unwrap().commit_mask@;
+    let cm = local.segments[page_id.segment_id].main.value().commit_mask@;
 
     set_int_range(start, start + len) <=
         local.commit_mask(page_id.segment_id).bytes(page_id.segment_id)

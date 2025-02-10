@@ -35,7 +35,7 @@ pub fn find_page(heap_ptr: HeapPtr, size: usize, huge_alignment: usize, Tracked(
         page.page_ptr.addr() != 0 ==> page.wf() && page.is_in(*local)
             && page.is_used_and_primary(*local),
         page.page_ptr.addr() != 0 ==> 
-            local.pages.index(page.page_id@).inner@.value.unwrap().xblock_size >= size,
+            local.pages.index(page.page_id@).inner.value().xblock_size >= size,
 {
     proof { const_facts(); }
 
@@ -63,7 +63,7 @@ fn find_free_page(heap_ptr: HeapPtr, size: usize, Tracked(local): Tracked<&mut L
         page.page_ptr.addr() != 0 ==> page.wf() && page.is_in(*local)
             && page.is_used_and_primary(*local),
         page.page_ptr.addr() != 0 ==> 
-            local.pages.index(page.page_id@).inner@.value.unwrap().xblock_size >= size,
+            local.pages.index(page.page_id@).inner.value().xblock_size >= size,
 {
     proof { const_facts(); }
     let pq = bin(size) as usize;
@@ -99,7 +99,7 @@ fn page_queue_find_free_ex(heap_ptr: HeapPtr, pq: usize, first_try: bool, Tracke
         page.page_ptr.addr() != 0 ==> page.wf() && page.is_in(*local)
             && page.is_used_and_primary(*local),
         page.page_ptr.addr() != 0 ==> 
-            local.pages.index(page.page_id@).inner@.value.unwrap().xblock_size == size_of_bin(pq as int)
+            local.pages.index(page.page_id@).inner.value().xblock_size == size_of_bin(pq as int)
 {
     let mut page = PagePtr { page_ptr: heap_ptr.get_pages(Tracked(&*local))[pq].first, page_id: Ghost(local.page_organization.used_dlist_headers[pq as int].first.get_Some_0()) };
     let ghost mut list_idx = 0;
@@ -194,7 +194,7 @@ fn page_fresh(heap_ptr: HeapPtr, pq: usize, Tracked(local): Tracked<&mut Local>)
         page.page_ptr.addr() != 0 ==> page.wf() && page.is_in(*local)
             && page.is_used_and_primary(*local),
         page.page_ptr.addr() != 0 ==> 
-            local.pages.index(page.page_id@).inner@.value.unwrap().xblock_size == size_of_bin(pq as int)
+            local.pages.index(page.page_id@).inner.value().xblock_size == size_of_bin(pq as int)
 
 {
     proof { size_of_bin_bounds(pq as int); }
@@ -217,7 +217,7 @@ fn page_fresh_alloc(heap_ptr: HeapPtr, pq: usize, block_size: usize, page_alignm
         page.page_ptr.addr() != 0 ==> page.wf() && page.is_in(*local)
             && page.is_used_and_primary(*local),
         page.page_ptr.addr() != 0 ==> 
-            local.pages.index(page.page_id@).inner@.value.unwrap().xblock_size == block_size,
+            local.pages.index(page.page_id@).inner.value().xblock_size == block_size,
 {
     let tld_ptr = heap_ptr.get_ref(Tracked(&*local)).tld_ptr;
     let page_ptr = crate::segment::segment_page_alloc(heap_ptr, block_size, page_alignment, tld_ptr, Tracked(&mut *local));
@@ -559,7 +559,7 @@ const MAX_RETIRE_SIZE: u32 = MEDIUM_OBJ_SIZE_MAX as u32;
 pub fn page_retire(page: PagePtr, Tracked(local): Tracked<&mut Local>)
     requires old(local).wf(), page.wf(), page.is_in(*old(local)),
         page.is_used_and_primary(*old(local)),
-        old(local).pages[page.page_id@].inner@.value.unwrap().used == 0,
+        old(local).pages[page.page_id@].inner.value().used == 0,
     ensures
         local.wf(),
         common_preserves(*old(local), *local),
@@ -598,7 +598,7 @@ fn page_free(page: PagePtr, pq: usize, force: bool, Tracked(local): Tracked<&mut
     requires old(local).wf(), page.wf(), page.is_in(*old(local)),
         page.is_used_and_primary(*old(local)),
         old(local).page_organization.valid_used_page(page.page_id@, pq as int, list_idx),
-        old(local).pages[page.page_id@].inner@.value.unwrap().used == 0,
+        old(local).pages[page.page_id@].inner.value().used == 0,
     ensures
         local.wf(),
         common_preserves(*old(local), *local),
@@ -636,7 +636,7 @@ fn page_to_full(page: PagePtr, heap: HeapPtr, pq: usize, Tracked(local): Tracked
 pub fn page_unfull(page: PagePtr, Tracked(local): Tracked<&mut Local>)
     requires old(local).wf(), page.wf(), page.is_in(*old(local)),
         page.is_used_and_primary(*old(local)),
-        old(local).pages[page.page_id@].inner@.value.unwrap().in_full(),
+        old(local).pages[page.page_id@].inner.value().in_full(),
     ensures local.wf(),
         common_preserves(*old(local), *local),
 {

@@ -431,7 +431,7 @@ pub fn page_extend_free(
         old(local).wf_main(),
         page_ptr.wf(),
         old(local).is_used_primary(page_ptr.page_id@),
-        old(local).pages[page_ptr.page_id@].inner@.value.unwrap().xblock_size % 8 == 0,
+        old(local).pages[page_ptr.page_id@].inner.value().xblock_size % 8 == 0,
     ensures
         local.wf_main(),
         local.is_used_primary(page_ptr.page_id@),

@@ -676,11 +676,11 @@ pub open spec fn common_preserves(l1: Local, l2: Local) -> bool {
 }
 
 impl Local {
-    pub open spec fn inst(&self) -> Mim::Instance {
+    pub open(crate) spec fn inst(&self) -> Mim::Instance {
         self.instance
     }
 
-    pub open spec fn wf(&self) -> bool {
+    pub open(crate) spec fn wf(&self) -> bool {
         self.wf_main()
           && self.page_organization.popped == Popped::No
     }

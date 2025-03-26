@@ -26,21 +26,22 @@ use crate::thread::*;
 verus!{
 
 pub tracked struct Global {
-    pub tracked instance: Mim::Instance,
-    pub tracked my_inst: Mim::my_inst,
+    pub(crate) tracked instance: Mim::Instance,
+    pub(crate) tracked my_inst: Mim::my_inst,
 }
 
 impl Global {
-    pub closed spec fn wf(&self) -> bool {
+    #[verifier::type_invariant]
+    pub(crate) closed spec fn wf(&self) -> bool {
         self.my_inst.instance_id() == self.instance.id()
         && self.my_inst.value() == self.instance.id()
     }
 
-    pub open spec fn wf_right_to_use_thread(&self, right: RightToUseThread, tid: ThreadId) -> bool {
+    pub open(crate) spec fn wf_right_to_use_thread(&self, right: RightToUseThread, tid: ThreadId) -> bool {
         right.instance_id() == self.instance.id() && right.element() == tid
     }
 
-    pub open spec fn inst(&self) -> MimInst {
+    pub open(crate) spec fn inst(&self) -> MimInst {
         self.instance
     }
 }
@@ -59,7 +60,6 @@ impl RightToUseThread {
 
 pub proof fn global_init() -> (tracked res: (Global, Map<ThreadId, Mim::right_to_use_thread>))    // $line_count$Trusted$
     ensures // $line_count$Trusted$
-        res.0.wf(), // $line_count$Trusted$
         forall |tid: ThreadId| #[trigger] res.1.dom().contains(tid) // $line_count$Trusted$
           && res.0.wf_right_to_use_thread(res.1[tid], tid) // $line_count$Trusted$
 {
@@ -75,7 +75,6 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
       Tracked(cur_thread): Tracked<IsThread> // $line_count$Trusted$
 ) -> (res: (HeapPtr, Tracked<Option<Local>>)) // $line_count$Trusted$
     requires global.wf_right_to_use_thread(right, cur_thread@), // $line_count$Trusted$
-        global.wf(), // $line_count$Trusted$
     ensures ({ let (heap, local_opt) = res; { // $line_count$Trusted$
         heap.heap_ptr.addr() != 0 ==> // $line_count$Trusted$
             local_opt@.is_some() // $line_count$Trusted$
@@ -85,6 +84,7 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
             && heap.is_in(local_opt@.unwrap()) // $line_count$Trusted$
     }}) // $line_count$Trusted$
 {
+    proof { use_type_invariant(&global); }
     increment_thread_count();
 
     // TODO use a cache for thread data

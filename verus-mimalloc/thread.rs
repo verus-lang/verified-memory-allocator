@@ -34,7 +34,7 @@ pub tracked struct IsThread { _no_send_sync: core::marker::PhantomData<*const ()
 
 #[verus::trusted]
 impl IsThread {
-    pub spec fn view(&self) -> ThreadId;
+    pub uninterp spec fn view(&self) -> ThreadId;
 
     /// Guarantees that any two `IsThread` objects on the same thread
     /// will have the same ID.

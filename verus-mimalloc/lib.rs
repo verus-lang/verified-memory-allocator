@@ -6,6 +6,7 @@
 #![allow(unused_macros)]
 #![feature(thread_id_value)]
 #![feature(strict_provenance)]
+#![verifier::exec_allows_no_decreases_clause]
 
 // bottom bread
 

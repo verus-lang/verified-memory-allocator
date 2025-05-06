@@ -112,7 +112,7 @@ impl MemChunk {
 
 #[verus::trusted]
 impl OsMem {
-    pub spec fn view(self) -> OsMemData;
+    pub uninterp spec fn view(self) -> OsMemData;
 }
 
 #[verus::trusted]

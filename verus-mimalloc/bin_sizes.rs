@@ -525,6 +525,7 @@ proof fn pow2_adds(e1:nat, e2:nat)
     decreases e1,        
 {
     if e1 == 0 {
+        assert(pow2(e1 as int) == 1);
     } else {
         calc! { (==)
             pow2(e1 as int) * pow2(e2 as int); {}

@@ -54,10 +54,19 @@ pub ghost struct BlockId {
 }
 
 impl PageId {
-    pub open spec fn range_from(&self, lo: int, hi: int) -> Set<PageId> {
-        Set::new(
+    pub open spec fn range_from(&self, lo: int, hi: int) -> ISet<PageId> {
+        ISet::new(
             |page_id: PageId| page_id.segment_id == self.segment_id
               && self.idx + lo <= page_id.idx < self.idx + hi
+        )
+    }
+
+    pub proof fn range_from_finite(&self, lo: int, hi: int)
+        ensures self.range_from(lo, hi).finite()
+    {
+        self.range_from(lo, hi).congruent_infiniteness(
+            Set::int_range(self.idx + lo, self.idx + hi)
+                .map(|idx: int| PageId{ segment_id: self.segment_id, idx: idx as nat } )
         )
     }
 }
@@ -158,12 +167,12 @@ pub ghost struct ThreadState {
     pub heap_id: HeapId,
     pub heap: HeapState,
 
-    pub segments: Map<SegmentId, SegmentState>,
-    pub pages: Map<PageId, PageState>,
+    pub segments: IMap<SegmentId, SegmentState>,
+    pub pages: IMap<PageId, PageState>,
 }
 
 pub ghost struct ThreadCheckedState {
-    pub pages: Set<PageId>,
+    pub pages: ISet<PageId>,
 }
 
 
@@ -205,7 +214,7 @@ pub type ThreadId = crate::thread::ThreadId;
 
 // PAPER CUT: doing this more than once, no generic finite condition for map,
 // having to do the maximum thing
-pub open spec fn segment_u_max(s: Set<SegmentId>) -> int
+pub open spec fn segment_u_max(s: ISet<SegmentId>) -> int
     decreases s.len() when s.finite()
 {
     if s.len() == 0 {
@@ -216,14 +225,14 @@ pub open spec fn segment_u_max(s: Set<SegmentId>) -> int
     }
 }
 
-proof fn segment_u_max_not_in(s: Set<SegmentId>)
+proof fn segment_u_max_not_in(s: ISet<SegmentId>)
     requires s.finite(),
     ensures forall |id: SegmentId| s.contains(id) ==> id.uniq < segment_u_max(s) + 1,
     decreases s.len(),
 {
     vstd::set_lib::lemma_set_empty_equivalency_len(s);
     if s.len() == 0 {
-        assert(s === Set::empty());
+        assert(s === ISet::empty());
     } else {
         let x = s.choose();
         let t = s.remove(x);
@@ -231,18 +240,18 @@ proof fn segment_u_max_not_in(s: Set<SegmentId>)
     }
 }
 
-pub open spec fn segment_get_unused_uniq_field(s: Set<SegmentId>) -> int {
+pub open spec fn segment_get_unused_uniq_field(s: ISet<SegmentId>) -> int {
     segment_u_max(s) + 1
 }
 
-pub proof fn lemma_segment_get_unused_uniq_field(s: Set<SegmentId>)
+pub proof fn lemma_segment_get_unused_uniq_field(s: ISet<SegmentId>)
     requires s.finite(),
     ensures forall |id: SegmentId| s.contains(id) ==> id.uniq != segment_get_unused_uniq_field(s)
 {
     segment_u_max_not_in(s);
 }
 
-pub open spec fn heap_u_max(s: Set<HeapId>) -> int
+pub open spec fn heap_u_max(s: ISet<HeapId>) -> int
     decreases s.len() when s.finite()
 {
     if s.len() == 0 {
@@ -253,14 +262,14 @@ pub open spec fn heap_u_max(s: Set<HeapId>) -> int
     }
 }
 
-proof fn heap_u_max_not_in(s: Set<HeapId>)
+proof fn heap_u_max_not_in(s: ISet<HeapId>)
     requires s.finite(),
     ensures forall |id: HeapId| s.contains(id) ==> id.uniq < heap_u_max(s) + 1,
     decreases s.len(),
 {
     vstd::set_lib::lemma_set_empty_equivalency_len(s);
     if s.len() == 0 {
-        assert(s === Set::empty());
+        assert(s === ISet::empty());
     } else {
         let x = s.choose();
         let t = s.remove(x);
@@ -268,11 +277,11 @@ proof fn heap_u_max_not_in(s: Set<HeapId>)
     }
 }
 
-pub open spec fn heap_get_unused_uniq_field(s: Set<HeapId>) -> int {
+pub open spec fn heap_get_unused_uniq_field(s: ISet<HeapId>) -> int {
     heap_u_max(s) + 1
 }
 
-pub proof fn lemma_heap_get_unused_uniq_field(s: Set<HeapId>)
+pub proof fn lemma_heap_get_unused_uniq_field(s: ISet<HeapId>)
     requires s.finite(),
     ensures forall |id: HeapId| s.contains(id) ==> id.uniq != heap_get_unused_uniq_field(s)
 {
@@ -296,65 +305,65 @@ tokenized_state_machine!{ Mim {
         #[sharding(map)] pub segment: Map<SegmentId, SegmentState>,
         #[sharding(map)] pub page: Map<PageId, PageState>,
         */
-        #[sharding(map)] pub thread_local_state: Map<ThreadId, ThreadState>,
-        #[sharding(set)] pub right_to_use_thread: Set<ThreadId>,
+        #[sharding(map)] pub thread_local_state: IMap<ThreadId, ThreadState>,
+        #[sharding(set)] pub right_to_use_thread: ISet<ThreadId>,
 
         // Blocks that are allocated (these ghost shards are handed to the user
         // to give them the right to 'deallocate')
 
-        #[sharding(map)] pub block: Map<BlockId, BlockState>,
+        #[sharding(map)] pub block: IMap<BlockId, BlockState>,
 
         // Atomics (accessed concurrently)
 
-        #[sharding(map)] pub thread_of_segment: Map<SegmentId, ThreadId>,
-        #[sharding(map)] pub delay: Map<PageId, DelayState>,
-        #[sharding(map)] pub heap_of_page: Map<PageId, HeapId>,
+        #[sharding(map)] pub thread_of_segment: IMap<SegmentId, ThreadId>,
+        #[sharding(map)] pub delay: IMap<PageId, DelayState>,
+        #[sharding(map)] pub heap_of_page: IMap<PageId, HeapId>,
 
         // Thread actors
 
-        #[sharding(map)] pub actor: Map<ThreadId, Actor>,
-        #[sharding(map)] pub delay_actor: Map<PageId, DelayFreeingActor>,
+        #[sharding(map)] pub actor: IMap<ThreadId, Actor>,
+        #[sharding(map)] pub delay_actor: IMap<PageId, DelayFreeingActor>,
 
         // Storage
 
-        #[sharding(storage_map)] pub segment_shared_access: Map<SegmentId, SegmentSharedAccess>,
+        #[sharding(storage_map)] pub segment_shared_access: IMap<SegmentId, SegmentSharedAccess>,
 
-        #[sharding(storage_map)] pub page_shared_access: Map<PageId, PageSharedAccess>,
+        #[sharding(storage_map)] pub page_shared_access: IMap<PageId, PageSharedAccess>,
 
-        #[sharding(storage_map)] pub heap_shared_access: Map<HeapId, HeapSharedAccess>,
+        #[sharding(storage_map)] pub heap_shared_access: IMap<HeapId, HeapSharedAccess>,
 
         // PAPER CUT
         // reason - deposit can't be after birds_eye so create_thread_mk_tokens needs to work
         // in two steps
-        #[sharding(set)] pub reserved_uniq: Set<HeapId>,
+        #[sharding(set)] pub reserved_uniq: ISet<HeapId>,
 
-        #[sharding(map)] pub thread_checked_state: Map<ThreadId, ThreadCheckedState>,
+        #[sharding(map)] pub thread_checked_state: IMap<ThreadId, ThreadCheckedState>,
 
         // Extra state that doesn't form tokens but helps writing invariants
 
-        //#[sharding(not_tokenized)] pub thread_segments: Map<ThreadId, Seq<SegmentId>>,
+        //#[sharding(not_tokenized)] pub thread_segments: IMap<ThreadId, Seq<SegmentId>>,
 
-        #[sharding(not_tokenized)] pub heap_to_thread: Map<HeapId, ThreadId>,
+        #[sharding(not_tokenized)] pub heap_to_thread: IMap<HeapId, ThreadId>,
     }
 
     init!{
         initialize() {
             init right_to_set_inst = true;
             init my_inst = Option::None;
-            init right_to_use_thread = Set::full();
-            init thread_local_state = Map::empty();
-            init thread_checked_state = Map::empty();
-            init block = Map::empty();
-            init thread_of_segment = Map::empty();
-            init delay = Map::empty();
-            init heap_of_page = Map::empty();
-            init actor = Map::empty();
-            init delay_actor = Map::empty();
-            init segment_shared_access = Map::empty();
-            init page_shared_access = Map::empty();
-            init heap_shared_access = Map::empty();
-            init heap_to_thread = Map::empty();
-            init reserved_uniq = Set::empty();
+            init right_to_use_thread = ISet::full();
+            init thread_local_state = IMap::empty();
+            init thread_checked_state = IMap::empty();
+            init block = IMap::empty();
+            init thread_of_segment = IMap::empty();
+            init delay = IMap::empty();
+            init heap_of_page = IMap::empty();
+            init actor = IMap::empty();
+            init delay_actor = IMap::empty();
+            init segment_shared_access = IMap::empty();
+            init page_shared_access = IMap::empty();
+            init heap_shared_access = IMap::empty();
+            init heap_to_thread = IMap::empty();
+            init reserved_uniq = ISet::empty();
         }
     }
 
@@ -650,8 +659,8 @@ tokenized_state_machine!{ Mim {
         ) {
             remove right_to_use_thread -= set { thread_id };
             remove reserved_uniq -= set { HeapId { id: 0, uniq: thread_state.heap_id.uniq, provenance: Provenance::null() } };
-            require thread_state.pages.dom() =~= Set::empty();
-            require thread_state.segments.dom() =~= Set::empty();
+            require thread_state.pages.dom() =~= ISet::empty();
+            require thread_state.segments.dom() =~= ISet::empty();
             have my_inst >= Some(let inst);
 
             require thread_state.heap.shared_access.wf2(thread_state.heap_id, inst);
@@ -672,11 +681,11 @@ tokenized_state_machine!{ Mim {
             };
 
             add thread_local_state += [ thread_id => real_thread_state ];
-            add thread_checked_state += [ thread_id => ThreadCheckedState { pages: Set::empty() } ];
+            add thread_checked_state += [ thread_id => ThreadCheckedState { pages: ISet::empty() } ];
         }
     }
 
-    pub closed spec fn mk_fresh_segment_id(tos: Map<SegmentId, ThreadId>, sid: SegmentId) -> SegmentId {
+    pub closed spec fn mk_fresh_segment_id(tos: IMap<SegmentId, ThreadId>, sid: SegmentId) -> SegmentId {
         let uniq = segment_get_unused_uniq_field(tos.dom());
         SegmentId { id: sid.id, provenance: sid.provenance, uniq: uniq }
     }
@@ -728,14 +737,14 @@ tokenized_state_machine!{ Mim {
             page_id: PageId,
             n_slices: nat,
             block_size: nat,
-            page_map: Map<PageId, PageState>,
+            page_map: IMap<PageId, PageState>,
         ) {
             remove thread_local_state -= [ thread_id => let ts ];
 
             require ts.segments.dom().contains(page_id.segment_id);
             require ts.segments[page_id.segment_id].is_enabled;
 
-            //let range = Set::new(|pid: PageId| pid.segment_id == page_id.segment_id
+            //let range = ISet::new(|pid: PageId| pid.segment_id == page_id.segment_id
             //      && page_id.idx <= pid.idx < page_id.idx + n_slices);
             //let new_pages = Map::new(
             //    |pid: PageId| range.contains(pid),
@@ -789,8 +798,8 @@ tokenized_state_machine!{ Mim {
             thread_id: ThreadId,
             page_id: PageId,
             n_slices: nat,
-            page_map: Map<PageId, PageState>,
-            psa_map: Map<PageId, PageSharedAccess>
+            page_map: IMap<PageId, PageState>,
+            psa_map: IMap<PageId, PageSharedAccess>
         ) {
             remove thread_local_state -= [ thread_id => let ts ];
 
@@ -863,7 +872,7 @@ tokenized_state_machine!{ Mim {
 
             birds_eye let ssa = pre.segment_shared_access[page_id.segment_id];
             //let ssa = ts.segments[page_id.segment_id].shared_access;
-            let block_map = Map::new(
+            let block_map = IMap::new(
                 |block_id: BlockId|
                     block_id.page_id == page_id
                       && old_num_blocks <= block_id.idx < new_num_blocks
@@ -901,7 +910,7 @@ tokenized_state_machine!{ Mim {
         page_destroy_block_tokens(
             thread_id: ThreadId,
             page_id: PageId,
-            blocks: Map<BlockId, BlockState>,
+            blocks: IMap<BlockId, BlockState>,
         ) {
             remove thread_local_state -= [ thread_id => let ts ];
             require ts.pages.dom().contains(page_id);
@@ -966,7 +975,7 @@ tokenized_state_machine!{ Mim {
             //          && ts.pages.dom().contains(pid)
             //          ==> ts.pages[pid].offset != pid.idx - page_id.idx;
 
-            let new_pages0 = Map::<PageId, PageState>::new(
+            let new_pages0 = IMap::<PageId, PageState>::new(
                 |pid: PageId| page_id.range_from(0, n_slices as int).contains(pid),
                 |pid: PageId|
                     PageState {
@@ -979,7 +988,7 @@ tokenized_state_machine!{ Mim {
             let ts2 = ThreadState { pages: new_pages, .. ts };
             add thread_local_state += [ thread_id => ts2 ];
 
-            let psa_map = Map::new(
+            let psa_map = IMap::new(
                 |pid: PageId| page_id.range_from(0, n_slices as int).contains(pid),
                 |pid: PageId| ts.pages[pid].shared_access,
             );
@@ -1215,7 +1224,7 @@ tokenized_state_machine!{ Mim {
     #[invariant]
     pub closed spec fn wf_heap_shared_access_requires_inst(&self) -> bool {
         self.my_inst.is_none() ==> 
-            self.heap_shared_access.dom() =~= Set::empty()
+            self.heap_shared_access.dom() =~= ISet::empty()
     }
 
     #[invariant]
@@ -1454,12 +1463,12 @@ tokenized_state_machine!{ Mim {
     fn segment_enable_inductive(pre: Self, post: Self, thread_id: ThreadId, segment_id: SegmentId, shared_access: SegmentSharedAccess) { }
    
     #[inductive(create_page_mk_tokens)]
-    fn create_page_mk_tokens_inductive(pre: Self, post: Self, thread_id: ThreadId, page_id: PageId, n_slices: nat, block_size: nat, page_map: Map<PageId, PageState>) {
+    fn create_page_mk_tokens_inductive(pre: Self, post: Self, thread_id: ThreadId, page_id: PageId, n_slices: nat, block_size: nat, page_map: IMap<PageId, PageState>) {
         
     }
    
     #[inductive(page_enable)]
-    fn page_enable_inductive(pre: Self, post: Self, thread_id: ThreadId, page_id: PageId, n_slices: nat, page_map: Map<PageId, PageState>, psa_map: Map<PageId, PageSharedAccess>) { }
+    fn page_enable_inductive(pre: Self, post: Self, thread_id: ThreadId, page_id: PageId, n_slices: nat, page_map: IMap<PageId, PageState>, psa_map: IMap<PageId, PageSharedAccess>) { }
    
     #[inductive(page_mk_block_tokens)]
     fn page_mk_block_tokens_inductive(pre: Self, post: Self, thread_id: ThreadId, page_id: PageId, old_num_blocks: nat, new_num_blocks: nat, block_size: nat) {
@@ -1478,7 +1487,7 @@ tokenized_state_machine!{ Mim {
         }
     }
 
-    proof fn block_map_with_len(blocks: Map<BlockId, BlockState>, page_id: PageId, len: int)
+    proof fn block_map_with_len(blocks: IMap<BlockId, BlockState>, page_id: PageId, len: int)
         requires
             blocks.dom().finite(), blocks.len() >= len,
             len >= 0,
@@ -1523,13 +1532,13 @@ tokenized_state_machine!{ Mim {
         }
     }
 
-    spec fn blocks_has(blocks: Map<BlockId, BlockState>, page_id: PageId, i: int) -> bool {
+    spec fn blocks_has(blocks: IMap<BlockId, BlockState>, page_id: PageId, i: int) -> bool {
         exists |block_id| blocks.dom().contains(block_id) && block_id.page_id == page_id
             && block_id.idx == i
     }
 
     #[inductive(page_destroy_block_tokens)]
-    fn page_destroy_block_tokens_inductive(pre: Self, post: Self, thread_id: ThreadId, page_id: PageId, blocks: Map<BlockId, BlockState>) {
+    fn page_destroy_block_tokens_inductive(pre: Self, post: Self, thread_id: ThreadId, page_id: PageId, blocks: IMap<BlockId, BlockState>) {
         let ts = pre.thread_local_state[thread_id];
         assert(forall |block_id: BlockId| blocks.dom().contains(block_id) ==>
             pre.block.dom().contains(block_id));

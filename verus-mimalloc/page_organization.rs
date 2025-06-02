@@ -54,6 +54,34 @@ pub ghost enum Popped {
     ExtraCount(SegmentId),
 }
 
+pub open spec fn pages_with_segment(segment_id: SegmentId, lo: int, hi: int, data_fn: spec_fn(PageId) -> PageData) -> Map<PageId, PageData>
+{
+    Map::new(
+        Set::int_range(lo, hi)
+            .map(|idx: int| PageId{ segment_id, idx: idx as nat }),
+        data_fn)
+}
+
+broadcast proof fn pages_with_segment_ensures(segment_id: SegmentId, lo: int, hi: int, data_fn: spec_fn(PageId) -> PageData)
+ensures (#[trigger] pages_with_segment(segment_id, lo, hi, data_fn)) .congruent(
+    IMap::new(
+        |page_id: PageId| page_id.segment_id == segment_id
+            && lo <= page_id.idx < hi, data_fn)),
+{
+}
+
+pub open spec fn keys_with_segment(segment_id: SegmentId, lo: int, hi: int) -> Set<PageId>
+{
+    Set::int_range(lo, hi)
+        .map(|idx: int| PageId{ segment_id, idx: idx as nat })
+}
+
+broadcast proof fn keys_with_segment_ensures(segment_id: SegmentId, lo: int, hi: int)
+ensures (#[trigger] keys_with_segment(segment_id, lo, hi)).congruent(
+    ISet::new(|page_id: PageId| page_id.segment_id == segment_id && 0 <= page_id.idx <= SLICES_PER_SEGMENT)),
+{
+}
+
 state_machine!{ PageOrg {
     fields {
         // Roughly corresponds to physical state
@@ -101,7 +129,7 @@ state_machine!{ PageOrg {
 
     #[invariant]
     pub closed spec fn end_is_unused(&self) -> bool {
-        forall |pid: PageId|
+        forall |pid: PageId| #![auto]
             self.pages.dom().contains(pid) && pid.idx == SLICES_PER_SEGMENT ==>
               !self.pages[pid].is_used
               && self.pages[pid].offset.is_none()
@@ -260,7 +288,7 @@ state_machine!{ PageOrg {
 
     #[invariant]
     pub closed spec fn ll_inv_valid_unused(&self) -> bool {
-        forall |i| 0 <= i < self.unused_lists.len() ==> valid_ll(self.pages, self.unused_dlist_headers[i], self.unused_lists[i])
+        forall |i| #![auto] 0 <= i < self.unused_lists.len() ==> valid_ll(self.pages, self.unused_dlist_headers[i], self.unused_lists[i])
         /*
           0 <= i < self.unused_lists.len() ==>
             forall |j| #![triggers self.unused_lists.index(i).index(j)]
@@ -277,7 +305,7 @@ state_machine!{ PageOrg {
 
     #[invariant]
     pub closed spec fn ll_inv_valid_used(&self) -> bool {
-        forall |i| 0 <= i < self.used_lists.len() ==> valid_ll(self.pages, self.used_dlist_headers[i], self.used_lists[i])
+        forall |i| #![auto] 0 <= i < self.used_lists.len() ==> valid_ll(self.pages, self.used_dlist_headers[i], self.used_lists[i])
         /*
         forall |i| #![triggers self.used_lists.index(i)]
           0 <= i < self.used_lists.len() ==>
@@ -1188,9 +1216,7 @@ state_machine!{ PageOrg {
             require pre.popped == Popped::No;
             require !pre.segments.dom().contains(segment_id);
 
-            let new_pages = Map::new(
-                |page_id: PageId| page_id.segment_id == segment_id
-                    && 0 <= page_id.idx <= SLICES_PER_SEGMENT,
+            let new_pages = pages_with_segment(segment_id, 0, SLICES_PER_SEGMENT+1,
                 |page_id: PageId| PageData {
                     dlist_entry: None,
                     count: None,
@@ -1199,6 +1225,29 @@ state_machine!{ PageOrg {
                     page_header_kind: None,
                     full: None,
                 });
+
+//             let i_new_pages = IMap::new(
+//                 |page_id: PageId| page_id.segment_id == segment_id
+//                     && 0 <= page_id.idx <= SLICES_PER_SEGMENT,
+//                 |page_id: PageId| PageData {
+//                     dlist_entry: None,
+//                     count: None,
+//                     offset: None,
+//                     is_used: false,
+//                     page_header_kind: None,
+//                     full: None,
+//                 });
+//             assert( Set::congruent(new_pages.dom(), i_new_pages.dom()) ) by {
+//                 pages_with_segment_ensures(segment_id, 0,SLICES_PER_SEGMENT+1,
+//                     |page_id: PageId| PageData {
+//                         dlist_entry: None,
+//                         count: None,
+//                         offset: None,
+//                         is_used: false,
+//                         page_header_kind: None,
+//                         full: None,
+//                     });
+//             };
 
             update segments = pre.segments.insert(segment_id, SegmentData { used: 0 });
             update pages = pre.pages.union_prefer_right(new_pages);
@@ -1225,9 +1274,7 @@ state_machine!{ PageOrg {
                     ==> !pre.pages[pid].is_used
                 );
 
-            let changed_pages = Map::new(
-                |pid: PageId| pid.segment_id == page_id.segment_id &&
-                    page_id.idx <= pid.idx < page_id.idx + count,
+            let changed_pages  = pages_with_segment(segment_id, page_id.idx as int, page_id.idx + count as int,
                 |pid: PageId| PageData {
                     count: if pid == page_id { Some(count as nat) } else { pre.pages[pid].count },
                     offset: Some((pid.idx - page_id.idx) as nat), // set offset
@@ -1239,6 +1286,22 @@ state_machine!{ PageOrg {
                     full: None,
                 }
             );
+
+//             let i_changed_pages = IMap::new(
+//                 |pid: PageId| pid.segment_id == page_id.segment_id &&
+//                     page_id.idx <= pid.idx < page_id.idx + count,
+//                 |pid: PageId| PageData {
+//                     count: if pid == page_id { Some(count as nat) } else { pre.pages[pid].count },
+//                     offset: Some((pid.idx - page_id.idx) as nat), // set offset
+//                     dlist_entry: pre.pages[pid].dlist_entry,
+//                     // keep is_used=false for now
+//                     // instead, we mark that this operation is done by setting popped=Ready
+//                     is_used: false,
+//                     page_header_kind: None,
+//                     full: None,
+//                 }
+//             );
+//             assert( Set::congruent(changed_pages.dom(), i_changed_pages.dom()) );
 
             let new_pages = pre.pages.union_prefer_right(changed_pages);
             assert pre.pages.dom() =~= new_pages.dom();
@@ -1272,9 +1335,8 @@ state_machine!{ PageOrg {
             let page_id = PageId { segment_id, idx: 0 };
             assert pre.pages.dom().contains(page_id);
             assert count + page_id.idx <= SLICES_PER_SEGMENT;
-            let changed_pages = Map::new(
-                |pid: PageId| pid.segment_id == segment_id &&
-                    0 <= pid.idx < count,
+
+            let changed_pages = pages_with_segment(segment_id, 0, count, 
                 |pid: PageId| PageData {
                     count: if pid == page_id { Some(count as nat) } else { pre.pages[pid].count },
                     offset: Some((pid.idx - page_id.idx) as nat), // set offset
@@ -1284,6 +1346,20 @@ state_machine!{ PageOrg {
                     full: None,
                 }
             );
+
+//             let i_changed_pages = IMap::new(
+//                 |pid: PageId| pid.segment_id == segment_id &&
+//                     0 <= pid.idx < count,
+//                 |pid: PageId| PageData {
+//                     count: if pid == page_id { Some(count as nat) } else { pre.pages[pid].count },
+//                     offset: Some((pid.idx - page_id.idx) as nat), // set offset
+//                     dlist_entry: pre.pages[pid].dlist_entry,
+//                     is_used: false,
+//                     page_header_kind: None,
+//                     full: None,
+//                 }
+//             );
+//             assert( Set::congruent(changed_pages.dom(), i_changed_pages.dom()) );
 
             let new_pages = pre.pages.union_prefer_right(changed_pages);
             assert pre.pages.dom() =~= new_pages.dom();
@@ -1430,15 +1506,25 @@ state_machine!{ PageOrg {
                         && pre.pages[pid].offset.unwrap() == pid.idx - page_id.idx
                 );
 
-            let changed_pages = Map::new(
-                |pid: PageId| pid.segment_id == page_id.segment_id &&
-                    page_id.idx <= pid.idx < page_id.idx + count,
+            let changed_pages = pages_with_segment(page_id.segment_id, page_id.idx as int, page_id.idx+count as int,
                 |pid: PageId| PageData {
                     is_used: true,
                     page_header_kind: if pid == page_id { Some(page_header_kind) } else { None },
                     .. pre.pages[pid]
                 }
             );
+
+//             let i_changed_pages = IMap::new(
+//                 |pid: PageId| pid.segment_id == page_id.segment_id &&
+//                     page_id.idx <= pid.idx < page_id.idx + count,
+//                 |pid: PageId| PageData {
+//                     is_used: true,
+//                     page_header_kind: if pid == page_id { Some(page_header_kind) } else { None },
+//                     .. pre.pages[pid]
+//                 }
+//             );
+// 
+//             assert( Set::congruent(changed_pages.dom(), i_changed_pages.dom()) );
 
             let new_pages = pre.pages.union_prefer_right(changed_pages);
             assert pre.pages.dom() =~= new_pages.dom();
@@ -1472,9 +1558,7 @@ state_machine!{ PageOrg {
                         && pre.pages[pid].offset.unwrap() == pid.idx - page_id.idx
                 );
 
-            let changed_pages = Map::new(
-                |pid: PageId| pid.segment_id == page_id.segment_id &&
-                    page_id.idx <= pid.idx < page_id.idx + count,
+            let changed_pages = pages_with_segment(page_id.segment_id, page_id.idx as int, page_id.idx + count as int, 
                 |pid: PageId| PageData {
                     is_used: false,
                     page_header_kind: None,
@@ -1483,6 +1567,19 @@ state_machine!{ PageOrg {
                     .. pre.pages[pid]
                 }
             );
+
+//             let i_changed_pages = IMap::new(
+//                 |pid: PageId| pid.segment_id == page_id.segment_id &&
+//                     page_id.idx <= pid.idx < page_id.idx + count,
+//                 |pid: PageId| PageData {
+//                     is_used: false,
+//                     page_header_kind: None,
+//                     offset: None,
+//                     count: None,
+//                     .. pre.pages[pid]
+//                 }
+//             );
+//             assert( Set::congruent(changed_pages.dom(), i_changed_pages.dom()) );
 
             let new_pages = pre.pages.union_prefer_right(changed_pages);
             assert pre.pages.dom() =~= new_pages.dom();
@@ -1712,8 +1809,7 @@ state_machine!{ PageOrg {
 
             let last_id = PageId { segment_id, idx: (count - 1) as nat };
 
-            let new_page_map = Map::<PageId, PageData>::new(
-                |page_id: PageId| page_id.segment_id == segment_id && 0 <= page_id.idx < count,
+            let new_page_map = pages_with_segment(page_id.segment_id, 0, count as int,
                 |page_id: PageId| PageData {
                     dlist_entry: None,
                     count: None,
@@ -1738,8 +1834,13 @@ state_machine!{ PageOrg {
             update segments = pre.segments.remove(segment_id);
             update popped = Popped::No;
 
-            let keys = Set::<PageId>::new(
-                |page_id: PageId| page_id.segment_id == segment_id && 0 <= page_id.idx <= SLICES_PER_SEGMENT);
+            let keys = keys_with_segment(segment_id, 0, SLICES_PER_SEGMENT+1);
+//             let keys = Set::int_range(0, SLICES_PER_SEGMENT+1)
+//                 .map(|idx: int| PageId{ segment_id, idx: idx as nat });
+//             let i_keys = ISet::<PageId>::new(
+//                 |page_id: PageId| page_id.segment_id == segment_id && 0 <= page_id.idx <= SLICES_PER_SEGMENT);
+//             assert( Set::congruent(keys, i_keys) );
+
             update pages = pre.pages.remove_keys(keys);
         }
     }
@@ -2373,6 +2474,7 @@ state_machine!{ PageOrg {
    
     #[inductive(allocate_popped)]
     fn allocate_popped_inductive(pre: Self, post: Self) {
+        broadcast use pages_with_segment_ensures;
         Self::ucount_preserve_all(pre, post);
         Self::unchanged_used_ll(pre, post);
         Self::unchanged_unused_ll(pre, post);
@@ -2400,6 +2502,7 @@ state_machine!{ PageOrg {
   
     #[inductive(set_range_to_used)]
     fn set_range_to_used_inductive(pre: Self, post: Self, page_header_kind: PageHeaderKind) {
+        broadcast use pages_with_segment_ensures;
         let page_id = post.popped.get_Used_0();
         let segment_id = page_id.segment_id;
         Self::unchanged_used_ll(pre, post);
@@ -2422,6 +2525,7 @@ state_machine!{ PageOrg {
 
     #[inductive(set_range_to_not_used)]
     fn set_range_to_not_used_inductive(pre: Self, post: Self) {
+        broadcast use pages_with_segment_ensures;
         let page_id = pre.popped.get_Used_0();
         let segment_id = page_id.segment_id;
 
@@ -2568,10 +2672,22 @@ state_machine!{ PageOrg {
         }
 
         reveal(State::ll_inv_exists_in_some_list);
+
+        broadcast use pages_with_segment_ensures;
+//         pages_with_segment_ensures(segment_id, 0, SLICES_PER_SEGMENT+1,
+//                 |page_id: PageId| PageData {
+//                     dlist_entry: None,
+//                     count: None,
+//                     offset: None,
+//                     is_used: false,
+//                     page_header_kind: None,
+//                     full: None,
+//                 });
     }
    
     #[inductive(forget_about_first_page)]
     fn forget_about_first_page_inductive(pre: Self, post: Self, count: int) {
+        broadcast use pages_with_segment_ensures;
         let segment_id = pre.popped.get_SegmentCreating_0();
         let page_id = PageId { segment_id, idx: count as nat };
         assert(post.good_range_very_unready(page_id));
@@ -3514,6 +3630,7 @@ state_machine!{ PageOrg {
 
     #[inductive(segment_freeing_start)]
     fn segment_freeing_start_inductive(pre: Self, post: Self, segment_id: SegmentId) {
+        broadcast use pages_with_segment_ensures;
         Self::ucount_preserve_all(pre, post);
         assert(post.popped_basics());
         Self::unchanged_unused_ll(pre, post);
@@ -3535,6 +3652,7 @@ state_machine!{ PageOrg {
 
     #[inductive(segment_freeing_finish)]
     fn segment_freeing_finish_inductive(pre: Self, post: Self) {
+        broadcast use keys_with_segment_ensures;
         Self::ucount_preserve_all(pre, post);
         Self::unchanged_used_ll(pre, post);
         let segment_id = pre.popped.get_SegmentFreeing_0();
@@ -4513,7 +4631,7 @@ state_machine!{ PageOrg {
         requires
           pre.invariant(),
           forall |sid: SegmentId| sid != esid && post.segments.dom().contains(sid) ==> pre.segments.dom().contains(sid),
-          forall |pid: PageId| pid.segment_id != esid ==>
+          forall |pid: PageId| #![auto] pid.segment_id != esid ==>
             (pre.pages.dom().contains(pid) <==> post.pages.dom().contains(pid))
             && (pre.pages.dom().contains(pid) ==> {
                 &&& pre.pages[pid].count == post.pages[pid].count
@@ -4790,7 +4908,7 @@ state_machine!{ PageOrg {
         requires pre.invariant(),
           pre.unused_lists == post.unused_lists,
           pre.unused_dlist_headers == post.unused_dlist_headers,
-          forall |page_id: PageId|
+          forall |page_id: PageId| #![auto]
             pre.pages.dom().contains(page_id)
               && !pre.pages[page_id].is_used
               ==> post.pages.dom().contains(page_id)

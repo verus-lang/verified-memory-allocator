@@ -286,8 +286,10 @@ fn page_init(heap_ptr: HeapPtr, page_ptr: PagePtr, block_size: usize, tld_ptr: T
         assert(local.page_organization.pages.dom().contains(pid));
         assert(local.page_organization.pages[pid].is_used == false);
     }
-    let ghost new_page_state_map = Map::new(
+//     assert( range.finite() );   // call range_ensures_finite
+    let ghost new_page_state_map = IMap::new(
             |pid: PageId| range.contains(pid),
+//             range.to_finite(),
             |pid: PageId| PageState {
                 offset: pid.idx - page_id.idx,
                 block_size: block_size as nat,
@@ -382,9 +384,15 @@ fn page_init(heap_ptr: HeapPtr, page_ptr: PagePtr, block_size: usize, tld_ptr: T
     });
 
     proof {
-        let tracked new_psa_map = local.unused_pages.tracked_remove_keys(range);
-        let ghost new_page_state_map2 = Map::new(
+        page_id.range_from_finite(0, n_slices as int);
+        let tracked new_psa_map = local.unused_pages.tracked_remove_keys(range.to_finite());
+
+        assert( new_psa_map.dom().finite() );
+        let tracked new_psa_map: IMap<_,_> = new_psa_map.tracked_to_infinite();
+
+        let ghost new_page_state_map2 = IMap::new(
             |pid: PageId| range.contains(pid),
+//             range.to_finite(),
             |pid: PageId| PageState {
                 //offset: pid.idx - page_id.idx,
                 //block_size: block_size as nat,

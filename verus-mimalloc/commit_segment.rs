@@ -2,6 +2,7 @@
 
 use vstd::prelude::*;
 use vstd::set_lib::*;
+use vstd::set::set_int_range;
 
 use crate::commit_mask::*;
 use crate::types::*;

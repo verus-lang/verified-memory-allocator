@@ -5,6 +5,7 @@ use crate::types::*;
 use crate::layout::*;
 use vstd::prelude::*;
 use vstd::set_lib::*;
+use vstd::set::set_int_range;
 
 verus!{
 

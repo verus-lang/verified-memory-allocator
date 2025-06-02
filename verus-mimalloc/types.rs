@@ -691,7 +691,7 @@ impl Local {
         &&& self.thread_token.instance_id() == self.instance.id()
         &&& self.thread_token.key() == self.thread_id
 
-        &&& self.thread_token.value().segments.dom() == self.segments.dom()
+        &&& self.thread_token.value().segments.dom() == self.segments.dom().to_infinite()
 
         &&& self.thread_token.value().heap_id == self.heap_id
         &&& self.heap.wf_basic(self.heap_id, self.thread_token.value().heap, self.tld_id, self.instance.id())
@@ -717,7 +717,7 @@ impl Local {
         //    self.thread_token.value().pages.dom().contains(page_id) <==>
         //    self.pages.dom().contains(page_id))
         //&&& self.thread_token.value().pages.dom() == self.pages.dom()
-        &&& self.thread_token.value().segments.dom() == self.segments.dom()
+        &&& self.thread_token.value().segments.dom() == self.segments.dom().to_infinite()
 
         &&& self.thread_token.value().heap_id == self.heap_id
         &&& self.heap.wf(self.heap_id, self.thread_token.value().heap, self.tld_id, self.instance.id(), self.page_empty_global@.s.points_to.ptr())

@@ -7,8 +7,8 @@ use vstd::raw_ptr::*;
 use vstd::*;
 use vstd::modes::*;
 use vstd::set_lib::*;
+use vstd::set::set_int_range;
 use vstd::pervasive::*;
-use vstd::set_lib::*;
 use vstd::cell::*;
 use vstd::atomic_ghost::*;
 
@@ -1267,7 +1267,7 @@ fn segment_alloc(
         /*assert(local.segments[segment_id].wf(segment_id,
                 local.thread_token.value().segments.index(segment_id),
                 local.instance));*/
-        assert(local.thread_token.value().segments.dom() =~= local.segments.dom());
+        assert(local.thread_token.value().segments.dom() =~= local.segments.dom().to_infinite());
 
         /*let org_pages = local.page_organization.pages;
         let pages = local.pages;
@@ -1843,13 +1843,13 @@ fn segment_page_clear(page: PagePtr, tld: TldPtr, Tracked(local): Tracked<&mut L
     proof {
         let tracked thread_state_tok = local.take_thread_token();
         let block_state_map = Map::new(
-            |block_id: BlockId| block_tokens.dom().contains(block_id),
+            block_tokens.dom(),
             |block_id: BlockId| block_tokens[block_id].value(),
         );
         assert(block_state_map.dom() =~= block_tokens.dom());
         let tracked thread_state_tok = local.instance.page_destroy_block_tokens(
-            local.thread_id, page_id, block_state_map,
-            thread_state_tok, Mim::block_map::from_map(local.instance.id(), block_tokens));
+            local.thread_id, page_id, block_state_map.to_infinite(),
+            thread_state_tok, Mim::block_map::from_map(local.instance.id(), block_tokens.tracked_to_infinite()));
         assert forall |pid: PageId| page_id.range_from(0, n_slices as int).contains(pid)
             implies thread_state_tok.value().pages.dom().contains(pid)
         by {
@@ -1875,8 +1875,9 @@ fn segment_page_clear(page: PagePtr, tld: TldPtr, Tracked(local): Tracked<&mut L
         local.thread_token = thread_state_tok;
         local.checked_token = checked_tok;
         psa_map = _psa_map;
+        assert(psa_map.dom().finite());
 
-        local.unused_pages.tracked_union_prefer_right(psa_map);
+        local.unused_pages.tracked_union_prefer_right(psa_map.to_finite());
     }
 
     let tracked delay_token;

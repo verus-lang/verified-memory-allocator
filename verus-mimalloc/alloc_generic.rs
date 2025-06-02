@@ -299,9 +299,10 @@ fn page_free_list_extend(
     );
     let tracked block_tokens = block_tokens.into_map();
     proof { local.thread_token = _thread_token; local.checked_token = _checked_token; }
-    let tracked mut block_tokens = Map::tracked_map_keys(block_tokens,
+    assert( block_tokens.dom().finite() );
+    let tracked mut block_tokens = Map::tracked_map_keys(block_tokens.tracked_to_finite(),
         Map::<int, BlockId>::new(
-          |i: int| cap_nat <= i < cap_nat + extend_nat,
+          Set::int_range(cap_nat as int, cap_nat + extend_nat as int),
           |i: int| BlockId {
               page_id: page_ptr.page_id@,
               idx: i as nat,

@@ -6,7 +6,7 @@ use crate::config::*;
 use crate::os_mem::*;
 use crate::layout::*;
 use crate::types::todo;
-use vstd::set_lib::set_int_range;
+use vstd::set::set_int_range;
 
 
 verus!{

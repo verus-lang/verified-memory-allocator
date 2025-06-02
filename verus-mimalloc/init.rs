@@ -7,6 +7,7 @@ use vstd::raw_ptr::*;
 use vstd::*;
 use vstd::modes::*;
 use vstd::set_lib::*;
+use vstd::set::set_int_range;
 use vstd::cell::*;
 use vstd::shared::Shared;
 
@@ -58,13 +59,13 @@ impl RightToUseThread {
 
 //impl Copy for Global { }
 
-pub proof fn global_init() -> (tracked res: (Global, Map<ThreadId, Mim::right_to_use_thread>))    // $line_count$Trusted$
+pub proof fn global_init() -> (tracked res: (Global, IMap<ThreadId, Mim::right_to_use_thread>))    // $line_count$Trusted$
     ensures // $line_count$Trusted$
         forall |tid: ThreadId| #[trigger] res.1.dom().contains(tid) // $line_count$Trusted$
           && res.0.wf_right_to_use_thread(res.1[tid], tid) // $line_count$Trusted$
 {
     let tracked (Tracked(instance), Tracked(right_to_set_inst), _, _, Tracked(rights), _, _, _, _, _, _, _, _) = Mim::Instance::initialize(
-        Map::tracked_empty(), Map::tracked_empty(), Map::tracked_empty(),
+        IMap::tracked_empty(), IMap::tracked_empty(), IMap::tracked_empty(),
         );
     let tracked my_inst = instance.set_inst(instance.id(), right_to_set_inst.tracked_unwrap());
     (Global { instance, my_inst }, rights.into_map())
@@ -205,8 +206,8 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
                 heap: HeapState {
                     shared_access: heap_shared_access,
                 },
-                segments: Map::empty(),
-                pages: Map::empty(),
+                segments: IMap::empty(),
+                pages: IMap::empty(),
             },
             &global.my_inst,
             right,

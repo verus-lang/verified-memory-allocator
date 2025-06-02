@@ -56,7 +56,7 @@ proof fn set_mismatch(s1:Set<nat>, s2:Set<nat>, missing:nat)
 
 /// Creates a finite set of nats in the range [lo, hi).
 pub open spec fn set_nat_range(lo: nat, hi: nat) -> Set<nat> {
-    Set::new(|i: nat| lo <= i && i < hi)
+    Set::int_range(lo as int, hi as int).map(|i| i as nat)
 }
 
 /// If a set solely contains nats in the range [a, b), then its size is

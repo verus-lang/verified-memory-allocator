@@ -6,6 +6,7 @@ use vstd::raw_ptr::*;
 use vstd::modes::*;
 use vstd::*;
 use vstd::set_lib::*;
+use vstd::set::set_int_range;
 use vstd::layout::*;
 use vstd::atomic_ghost::*;
 
@@ -455,7 +456,7 @@ impl LL {
             points_to.ptr() == ptr
               && points_to.opt_value() == MemContents::Init(Node { ptr: next })
 
-              && points_to_raw.dom() == perm.dom().difference(set_int_range(ptr as int, ptr as int + size_of::<Node>()))
+              && points_to_raw.dom() == perm.dom().finite_difference(set_int_range(ptr as int, ptr as int + size_of::<Node>()))
               && points_to_raw.provenance() == ptr@.provenance
         }),
     {
@@ -630,9 +631,9 @@ impl LL {
             tracked_swap(self.perms.borrow_mut(), &mut self_map);
 
             let key_map = Map::<nat, nat>::new(
-                    |i: nat| self_len <= i < self_len + other_len,
-                    |i: nat| (i - self_len) as nat,
-                );
+                set_nat_range(self_len, self_len + other_len),
+                |i: nat| (i - self_len) as nat,
+            );
             assert forall|j| key_map.dom().contains(j) implies other_map.dom().contains(key_map.index(j))
             by {
                 let r = (j - self_len) as nat;
@@ -1149,7 +1150,7 @@ impl LL {
     {
         let tracked llgstr = Self::llgstr_merge(llgstr1, llgstr2);
         let idxmap = Map::<nat, nat>::new(
-            |p| llgstr.map.dom().contains(p),
+            llgstr.map.dom(),
             |p| llgstr.map[p].1.key().idx);
         if exists |p| llgstr.map.dom().contains(p) && !(0 <= idxmap[p] < n_blocks) {
             let p = choose |p| llgstr.map.dom().contains(p) && !(0 <= idxmap[p] < n_blocks);
@@ -1195,7 +1196,7 @@ impl LL {
         let tracked LLGhostStateToReconvene { map: mut map1, .. } = llgstr1;
         let tracked LLGhostStateToReconvene { map: mut map2, .. } = llgstr2;
         map2.tracked_map_keys_in_place(Map::<nat, nat>::new(
-            |k: nat| map1.len() <= k < map1.len() + map2.len(),
+            set_nat_range(map1.len(), map1.len() + map2.len()),
             |k: nat| (k - map1.len()) as nat,
         ));
         map1.tracked_union_prefer_right(map2);
@@ -1318,7 +1319,7 @@ pub closed spec fn has_idx(map: Map<nat, (PointsToRaw, Mim::block)>, i: nat) -> 
 }
 
 pub open spec fn set_nat_range(lo: nat, hi: nat) -> Set<nat> {
-    Set::new(|i: nat| lo <= i && i < hi)
+    Set::int_range(lo as int, hi as int).map(|i: int| i as nat)
 }
 
 pub proof fn lemma_nat_range(lo: nat, hi: nat)
@@ -1419,7 +1420,7 @@ pub fn bound_on_2_lists(
             let tracked LLGhostStateToReconvene { map: mut map, .. } = llgstr;
 
             let idxmap = Map::<nat, nat>::new(
-                |p| map.dom().contains(p),
+                map.dom(),
                 |p| map[p].1.key().idx);
             if exists |p| map.dom().contains(p) && !(0 <= idxmap[p] < n_blocks) {
                 let p = choose |p| map.dom().contains(p) && !(0 <= idxmap[p] < n_blocks);
@@ -1476,7 +1477,7 @@ pub fn bound_on_1_lists(
             let tracked mut map = LL::convene_pt_map(m, len, instance, page_id, block_size);
 
             let idxmap = Map::<nat, nat>::new(
-                |p| map.dom().contains(p),
+                map.dom(),
                 |p| map[p].1.key().idx);
             if exists |p| map.dom().contains(p) && !(0 <= idxmap[p] < n_blocks) {
                 let p = choose |p| map.dom().contains(p) && !(0 <= idxmap[p] < n_blocks);

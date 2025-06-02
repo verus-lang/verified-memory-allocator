@@ -1,5 +1,6 @@
 use vstd::prelude::*;
 use vstd::set_lib::*;
+use vstd::set::set_int_range;
 use vstd::raw_ptr::*;
 use vstd::modes::*;
 
@@ -37,27 +38,27 @@ impl MemChunk {
         len: int
     ) -> (tracked t: Self)
         ensures
-            t.points_to.dom() == old(self).points_to.dom().intersect(set_int_range(start, start + len)),
+            t.points_to.dom() == old(self).points_to.dom().finite_intersect(set_int_range(start, start + len)),
             t.os == old(self).os.restrict(set_int_range(start, start + len)),
-            self.points_to.dom() == old(self).points_to.dom().difference(set_int_range(start, start + len)),
+            self.points_to.dom() == old(self).points_to.dom().finite_difference(set_int_range(start, start + len)),
             self.os == old(self).os.remove_keys(set_int_range(start, start + len)),
             self.points_to.provenance() == old(self).points_to.provenance(),
             self.points_to.provenance() == t.points_to.provenance(),
     {
         let tracked split_os = self.os.tracked_remove_keys(
-            set_int_range(start, start + len).intersect(self.os.dom())
+            set_int_range(start, start + len).finite_intersect(self.os.dom())
         );
 
         let tracked mut pt = PointsToRaw::empty(self.points_to.provenance());
         tracked_swap(&mut pt, &mut self.points_to);
-        let tracked (rt, pt) = pt.split(set_int_range(start, start + len).intersect(pt.dom()));
+        let tracked (rt, pt) = pt.split(set_int_range(start, start + len).finite_intersect(pt.dom()));
         self.points_to = pt;
 
         let tracked t = MemChunk { os: split_os, points_to: rt };
 
-        assert(self.points_to.dom() =~= old(self).points_to.dom().difference(set_int_range(start, start + len)));
+        assert(self.points_to.dom() =~= old(self).points_to.dom().finite_difference(set_int_range(start, start + len)));
         assert(self.os =~= old(self).os.remove_keys(set_int_range(start, start + len)));
-        assert(t.points_to.dom() =~= old(self).points_to.dom().intersect(set_int_range(start, start + len)));
+        assert(t.points_to.dom() =~= old(self).points_to.dom().finite_intersect(set_int_range(start, start + len)));
         assert(t.os =~= old(self).os.restrict(set_int_range(start, start + len)));
 
         t
@@ -70,7 +71,7 @@ impl MemChunk {
         requires
             old(self).points_to.provenance() == t.points_to.provenance(),
         ensures
-            self.points_to.dom() == old(self).points_to.dom().union(t.points_to.dom()),
+            self.points_to.dom() == old(self).points_to.dom().finite_union(t.points_to.dom()),
             self.os == old(self).os.union_prefer_right(t.os),
             self.points_to.provenance() == old(self).points_to.provenance(),
     {
@@ -104,7 +105,7 @@ impl MemChunk {
             s <= old(self).points_to.dom()
         ensures
             self.os == old(self).os,
-            self.points_to.dom() == old(self).points_to.dom().difference(s),
+            self.points_to.dom() == old(self).points_to.dom().finite_difference(s),
             points_to.dom() == s,
             self.points_to.provenance() == old(self).points_to.provenance(),
             points_to.provenance() == old(self).points_to.provenance(),
@@ -127,7 +128,7 @@ impl MemChunk {
             old(self).pointsto_has_range(start, len),
         ensures
             self.os == old(self).os,
-            self.points_to.dom() == old(self).points_to.dom().difference(set_int_range(start, start+len)),
+            self.points_to.dom() == old(self).points_to.dom().finite_difference(set_int_range(start, start+len)),
             self.points_to.provenance() == old(self).points_to.provenance(),
             points_to.is_range(start, len),
             points_to.provenance() == old(self).points_to.provenance(),
@@ -162,7 +163,7 @@ impl MemChunk {
 }
 
 pub open spec fn segment_info_range(segment_id: SegmentId) -> Set<int> {
-    set_int_range(segment_start(segment_id),
+    Set::int_range(segment_start(segment_id),
         segment_start(segment_id) + SIZEOF_SEGMENT_HEADER + SIZEOF_PAGE_HEADER * (SLICES_PER_SEGMENT + 1)
     )
 }
@@ -194,7 +195,7 @@ pub open spec fn mem_chunk_good1(
 impl Local {
     spec fn segment_page_range(&self, segment_id: SegmentId, page_id: PageId) -> Set<int> {
         if page_id.segment_id == segment_id && self.is_used_primary(page_id) {
-            set_int_range(
+            Set::int_range(
                 page_start(page_id) + start_offset(self.block_size(page_id)),
                 page_start(page_id) + start_offset(self.block_size(page_id))
                     + self.page_capacity(page_id) * self.block_size(page_id)
@@ -204,15 +205,20 @@ impl Local {
         }
     }
 
+    closed spec fn alladdrs(&self) -> Set<int>
+    {
+        // TODO(jonh): as Travis for the equivalent of os.dom()
+        Set::empty()
+    }
+
     pub closed spec fn segment_pages_range_total(&self, segment_id: SegmentId) -> Set<int> {
-        Set::<int>::new(|addr| exists |page_id|
-            self.segment_page_range(segment_id, page_id).contains(addr)
-        )
+        self.alladdrs().filter(|addr| exists |page_id|
+            self.segment_page_range(segment_id, page_id).contains(addr))
     }
 
     spec fn segment_page_used(&self, segment_id: SegmentId, page_id: PageId) -> Set<int> {
         if page_id.segment_id == segment_id && self.is_used_primary(page_id) {
-            set_int_range(
+            Set::int_range(
                 page_start(page_id),
                 page_start(page_id) + self.page_count(page_id) * SLICE_SIZE
             )
@@ -222,12 +228,11 @@ impl Local {
     }
 
     pub closed spec fn segment_pages_used_total(&self, segment_id: SegmentId) -> Set<int> {
-        Set::<int>::new(|addr| exists |page_id|
-            self.segment_page_used(segment_id, page_id).contains(addr)
-        )
+        self.alladdrs().filter(|addr| exists |page_id|
+            self.segment_page_used(segment_id, page_id).contains(addr))
     }
 
-    /*spec fn segment_page_range_reserved(&self, segment_id: SegmentId, page_id: PageId) -> Set<int> {
+    /*spec fn segment_page_range_reserved(&self, segment_id: SegmentId, page_id: PageId) -> ISet<int> {
         if page_id.segment_id == segment_id && self.is_used_primary(page_id) {
             set_int_range(
                 page_start(page_id) + start_offset(self.block_size(page_id)),
@@ -235,12 +240,12 @@ impl Local {
                     + self.page_reserved(page_id) * self.block_size(page_id)
             )
         } else {
-            Set::empty()
+            ISet::empty()
         }
     }
 
-    spec fn segment_pages_range_reserved_total(&self, segment_id: SegmentId) -> Set<int> {
-        Set::<int>::new(|addr| exists |page_id|
+    spec fn segment_pages_range_reserved_total(&self, segment_id: SegmentId) -> ISet<int> {
+        ISet::<int>::new(|addr| exists |page_id|
             self.segment_page_range_reserved(segment_id, page_id).contains(addr)
         )
     }*/

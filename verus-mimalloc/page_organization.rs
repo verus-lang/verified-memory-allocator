@@ -63,11 +63,18 @@ pub open spec fn pages_with_segment(segment_id: SegmentId, lo: int, hi: int, dat
 }
 
 broadcast proof fn pages_with_segment_ensures(segment_id: SegmentId, lo: int, hi: int, data_fn: spec_fn(PageId) -> PageData)
+requires 0<=lo<=hi,
 ensures (#[trigger] pages_with_segment(segment_id, lo, hi, data_fn)) .congruent(
     IMap::new(
         |page_id: PageId| page_id.segment_id == segment_id
             && lo <= page_id.idx < hi, data_fn)),
 {
+    let ir = Set::int_range(lo, hi);
+    let im = IMap::new(|page_id: PageId| page_id.segment_id == segment_id && lo <= page_id.idx < hi, data_fn);
+    assert forall |k| #![auto] im.dom().contains(k)
+        implies pages_with_segment(segment_id, lo, hi, data_fn).dom().contains(k) by {
+        assert( ir.contains(k.idx as int) );    // witness to map exists
+    }
 }
 
 pub open spec fn keys_with_segment(segment_id: SegmentId, lo: int, hi: int) -> Set<PageId>
@@ -77,9 +84,16 @@ pub open spec fn keys_with_segment(segment_id: SegmentId, lo: int, hi: int) -> S
 }
 
 broadcast proof fn keys_with_segment_ensures(segment_id: SegmentId, lo: int, hi: int)
+requires 0<=lo<=hi,
 ensures (#[trigger] keys_with_segment(segment_id, lo, hi)).congruent(
-    ISet::new(|page_id: PageId| page_id.segment_id == segment_id && 0 <= page_id.idx <= SLICES_PER_SEGMENT)),
+    ISet::new(|page_id: PageId| page_id.segment_id == segment_id && lo <= page_id.idx < hi)),
 {
+    let ir = Set::int_range(lo, hi);
+    let iset = ISet::new(|page_id: PageId| page_id.segment_id == segment_id && lo <= page_id.idx < hi);
+    let fset = keys_with_segment(segment_id, lo, hi);
+    assert forall |k| #![auto] iset.contains(k) implies fset.contains(k) by {
+        assert( ir.contains(k.idx as int) );    // witness to map exists
+    }
 }
 
 state_machine!{ PageOrg {

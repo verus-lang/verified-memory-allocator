@@ -176,7 +176,9 @@ fn os_commitx(
 
     let tracked weird_extra = mem.take_points_to_set(
           mem.points_to.dom() - mem.os_rw_bytes());
+
     let tracked mut exact_mem = mem.split(addr as int, size as int);
+
     let ghost em = exact_mem;
 
     if commit {

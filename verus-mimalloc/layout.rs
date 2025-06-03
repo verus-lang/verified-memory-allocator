@@ -563,20 +563,21 @@ pub fn align_up(x: usize, y: usize) -> (res: usize)
 
 #[verifier::integer_ring]
 pub proof fn mod_trans(a: int, b: int, c: int)
-    requires /*b != 0, c != 0,*/ a % b == 0, b % c == 0,
+    requires b != 0, c != 0, a % b == 0, b % c == 0,
     ensures a % c == 0
 {
 }
 
 #[verifier::integer_ring]
 pub proof fn mod_mul(a: int, b: int, c: int)
-    requires b % c == 0, // c > 0
+    requires b % c == 0, c != 0
     ensures (a * b) % c == 0,
 {
 }
 
 #[verifier::integer_ring]
 pub proof fn mul_mod_right(a: int, b: int)
+    requires b != 0,
     ensures (a * b) % b == 0,
 {
 }

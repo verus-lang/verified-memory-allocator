@@ -59,6 +59,16 @@ pub open spec fn set_nat_range(lo: nat, hi: nat) -> Set<nat> {
     Set::int_range(lo as int, hi as int).map(|i| i as nat)
 }
 
+pub broadcast proof fn lemma_nat_range_contains(lo: nat, hi: nat)
+ensures
+    #![trigger set_nat_range(lo, hi)]
+    forall |x: nat| lo <= x < hi <==> #[trigger] set_nat_range(lo, hi).contains(x)
+{
+    assert forall |x: nat| lo <= x < hi implies set_nat_range(lo, hi).contains(x) by {
+        assert(Set::int_range(lo as int, hi as int).contains(x as int));    // witness exists
+    }
+}
+
 /// If a set solely contains nats in the range [a, b), then its size is
 /// bounded by b - a.
 pub proof fn lemma_nat_range(lo: nat, hi: nat)
@@ -70,6 +80,7 @@ pub proof fn lemma_nat_range(lo: nat, hi: nat)
     decreases
         hi - lo,
 {
+    broadcast use lemma_nat_range_contains;
     if lo == hi {
         assert(set_nat_range(lo, hi) =~= Set::empty());
     } else {
@@ -86,6 +97,7 @@ proof fn nat_set_size(s:Set<nat>, bound:nat)
         s.finite(),
         s.len() == bound,
 {
+    broadcast use lemma_nat_range_contains;
     let nats = set_nat_range(0, bound);
     lemma_nat_range(0, bound);
     assert(s =~= nats);

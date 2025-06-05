@@ -263,6 +263,7 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
             emp));
         assert(local.heap.wf_basic(local.heap_id, local.thread_token.value().heap, local.tld_id, local.instance.id()));
         assert(local.heap.wf(local.heap_id, local.thread_token.value().heap, local.tld_id, local.instance.id(), local.page_empty_global@.s.points_to.ptr()));
+        assert( local.thread_token.value().segments.dom() == local.segments.dom().to_infinite() );  // extn
         assert(local.wf_main());
         assert(local.wf());
     }

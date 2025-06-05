@@ -508,6 +508,23 @@ pub fn segment_delayed_decommit(
 
         let p = segment.segment_ptr.addr() + idx * COMMIT_SIZE as usize;
         let size = count * COMMIT_SIZE as usize;
+        proof {
+            assert(
+                local.decommit_mask(segment.segment_id@)
+                == local.segments[segment.segment_id@].main.value().decommit_mask );
+            let mask: CommitMask = local.decommit_mask(segment.segment_id@);
+            // bytes is opaque. What should be know about it?
+            // This is the only lemma about bytes, but it requires a thing we don't have. Ugh. Ask
+            // travis.
+            // Notably, though, the CommitMask::view fn is now a new (closed) defn. Relevant? But
+            // closed?
+            assume( false );    // TODO(jonh): get help from travis
+            set_int_range_commit_size(segment.segment_id@, mask);
+            assert(
+                set_int_range(p as int, p + size)
+                 <= local.decommit_mask(segment.segment_id@).bytes(segment.segment_id@)
+            );
+        }
         segment_commitx(segment, false, p, size, Tracked(&mut *local));
     }
 }

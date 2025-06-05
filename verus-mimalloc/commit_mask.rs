@@ -319,7 +319,7 @@ impl CommitMask {
     }
 
     pub fn create_intersect(&self, other: &CommitMask, res: &mut CommitMask)
-        ensures res@ == self@.finite_intersect(other@)
+        ensures res@ == self@.intersect(other@)
     {
         let mut i = 0;
         while i < 8
@@ -334,12 +334,12 @@ impl CommitMask {
             other.lemma_view();
             res.lemma_view();
             lemma_is_bit_set();
-            assert(res@ =~= self@.finite_intersect(other@));
+            assert(res@ =~= self@.intersect(other@));
         }
     }
 
     pub fn clear(&mut self, other: &CommitMask)
-        ensures self@ == old(self)@.finite_difference(other@)
+        ensures self@ == old(self)@.difference(other@)
     {
         let mut i = 0;
         while i < 8
@@ -356,12 +356,12 @@ impl CommitMask {
             other.lemma_view();
             self.lemma_view();
             lemma_is_bit_set();
-            assert(self@ =~= old(self)@.finite_difference(other@));
+            assert(self@ =~= old(self)@.difference(other@));
         }
     }
 
     pub fn set(&mut self, other: &CommitMask)
-        ensures self@ == old(self)@.finite_union(other@)
+        ensures self@ == old(self)@.union(other@)
     {
         let mut i = 0;
         while i < 8
@@ -378,7 +378,7 @@ impl CommitMask {
             other.lemma_view();
             self.lemma_view();
             lemma_is_bit_set();
-            assert(self@ =~= old(self)@.finite_union(other@));
+            assert(self@ =~= old(self)@.union(other@));
         }
     }
 
@@ -389,7 +389,7 @@ impl CommitMask {
             forall|j: int| 0 <= j < i ==> other.mask[j] == self.mask[j],
             forall|j: int| i < j < 8 ==> other.mask[j] == self.mask[j],
         ensures
-            other@ == self@.finite_union(
+            other@ == self@.union(
 //                 ISet::new(|b: usize| b < 64 && is_bit_set(other.mask[i], b))
                 Set::int_range(0, 64).map(|b:int| b as usize).filter(|b| is_bit_set(other.mask[i], b))
                 .map(|b: usize| 64 * i + b)),
@@ -417,11 +417,11 @@ impl CommitMask {
         let s3 = Self::all_tuples().filter(|t: (int, usize)| i < t.0 && is_bit_set(self.mask[t.0], t.1));
         assert( Set::congruent(s3,
                 ISet::new(|t: (int, usize)| i <  t.0 < 8 && t.1 < 64 && is_bit_set(self.mask[t.0], t.1))) );
-        assert(s_full =~= s1.finite_union(s2).finite_union(s3));
+        assert(s_full =~= s1.union(s2).union(s3));
         assert(s2 =~= Set::empty()) by { lemma_is_bit_set(); }
         lemma_map_distribute_auto::<(int,usize),int>();
-        assert(s_full.map(f) =~= s1.map(f).finite_union(s2.map(f)).finite_union(s3.map(f)));
-        assert(s_full_o =~= s_full.finite_union(s2o));
+        assert(s_full.map(f) =~= s1.map(f).union(s2.map(f)).union(s3.map(f)));
+        assert(s_full_o =~= s_full.union(s2o));
         assert forall|x| #![auto] s_un.map(f_un).contains(x) implies s2o.map(f).contains(x) by {
             assert(s2o.contains((i, choose|y| s_un.contains(y) && f_un(y) == x)));
         };
@@ -496,7 +496,7 @@ impl CommitMask {
                     let oofs = oofs@;
                     lemma_is_bit_set();
                     old_self@.lemma_change_one_entry(self, oi as int);
-                    assert(self@ == old_self@@.finite_union(
+                    assert(self@ == old_self@@.union(
                             Set::int_range(0, 64).map(|b| b as usize).filter(|b| is_bit_set(self.mask[oi as int], b))
 //                             ISet::new(|b: usize| b < 64 && is_bit_set(self.mask[oi as int], b))
                                 .map(|b: usize| 64 * oi + b)));

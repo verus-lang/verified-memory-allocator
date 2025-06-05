@@ -456,7 +456,7 @@ impl LL {
             points_to.ptr() == ptr
               && points_to.opt_value() == MemContents::Init(Node { ptr: next })
 
-              && points_to_raw.dom() == perm.dom().finite_difference(set_int_range(ptr as int, ptr as int + size_of::<Node>()))
+              && points_to_raw.dom() == perm.dom().difference(set_int_range(ptr as int, ptr as int + size_of::<Node>()))
               && points_to_raw.provenance() == ptr@.provenance
         }),
     {

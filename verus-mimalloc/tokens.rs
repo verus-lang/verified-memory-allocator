@@ -62,8 +62,18 @@ impl PageId {
     }
 
     pub proof fn range_from_finite(&self, lo: int, hi: int)
+        requires 0 <= lo
         ensures self.range_from(lo, hi).finite()
     {
+        assert forall |x|
+            self.range_from(lo, hi).contains(x)
+            implies
+            Set::int_range(self.idx + lo, self.idx + hi)
+                .map(|idx: int| PageId{ segment_id: self.segment_id, idx: idx as nat } ).contains(x)
+        by {
+            assert( Set::int_range(self.idx + lo, self.idx + hi).contains(x.idx as int) );
+        }
+
         self.range_from(lo, hi).congruent_infiniteness(
             Set::int_range(self.idx + lo, self.idx + hi)
                 .map(|idx: int| PageId{ segment_id: self.segment_id, idx: idx as nat } )

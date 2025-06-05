@@ -862,6 +862,13 @@ impl Local {
           && self.page_organization.pages[page_id].offset == Some(0nat)
     }
 
+    pub open spec fn used_primary_set(&self) -> Set<PageId> {
+        self.page_organization.pages.dom()
+        .filter(|page_id|
+                 self.page_organization.pages[page_id].is_used
+              && self.page_organization.pages[page_id].offset == Some(0nat) )
+    }
+
     pub open spec fn page_reserved(&self, page_id: PageId) -> int {
         self.pages[page_id].inner.value().reserved as int
     }

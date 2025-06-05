@@ -205,15 +205,9 @@ impl Local {
         }
     }
 
-    closed spec fn alladdrs(&self) -> Set<int>
-    {
-        // TODO(jonh): as Travis for the equivalent of os.dom()
-        Set::empty()
-    }
-
     pub closed spec fn segment_pages_range_total(&self, segment_id: SegmentId) -> Set<int> {
-        self.alladdrs().filter(|addr| exists |page_id|
-            self.segment_page_range(segment_id, page_id).contains(addr))
+        self.used_primary_set()
+            .product(|page_id| self.segment_page_range(segment_id, page_id))
     }
 
     spec fn segment_page_used(&self, segment_id: SegmentId, page_id: PageId) -> Set<int> {
@@ -228,8 +222,8 @@ impl Local {
     }
 
     pub closed spec fn segment_pages_used_total(&self, segment_id: SegmentId) -> Set<int> {
-        self.alladdrs().filter(|addr| exists |page_id|
-            self.segment_page_used(segment_id, page_id).contains(addr))
+        self.used_primary_set()
+            .product(|page_id| self.segment_page_used(segment_id, page_id))
     }
 
     /*spec fn segment_page_range_reserved(&self, segment_id: SegmentId, page_id: PageId) -> ISet<int> {
@@ -283,6 +277,7 @@ pub proof fn range_total_le_used_total(local: Local, sid: SegmentId)
         assert(p_capacity * p_blocksize <= p_reserved * p_blocksize) by(nonlinear_arith)
             requires p_capacity <= p_reserved, p_blocksize >= 0;
         assert(local.segment_page_used(sid, pid).contains(addr));
+        assert( local.used_primary_set().contains(pid) );   // trigger segment_pages_used_total product
     }
 }
 
@@ -422,6 +417,7 @@ pub proof fn preserves_mem_chunk_good_except(local1: Local, local2: Local, esegm
               requires local1.page_capacity(page_id) <= local2.page_capacity(page_id),
                   local1.block_size(page_id) == local2.block_size(page_id);
             assert(local2.segment_page_range(sid, page_id).contains(addr));
+            assert(local2.used_primary_set().contains(page_id) );   // trigger segment_pages_used_total product
         }
         assert(pages_range_total1.subset_of(pages_range_total2));
         assert(mem.os_rw_bytes().subset_of(
@@ -465,6 +461,7 @@ pub proof fn preserves_segment_pages_used_total(local1: Local, local2: Local, si
     by {
         let pid = choose |pid| local2.segment_page_used(sid, pid).contains(addr);
         assert(local1.segment_page_used(sid, pid).contains(addr));
+        assert(local1.used_primary_set().contains(pid) );   // trigger segment_pages_used_total product
     }
 }
 
@@ -486,24 +483,28 @@ pub proof fn preserve_totals(local1: Local, local2: Local, sid: SegmentId)
     by {
         let pid = choose |pid| local2.segment_page_used(sid, pid).contains(addr);
         assert(local1.segment_page_used(sid, pid).contains(addr));
+        assert(local1.used_primary_set().contains(pid));
     }
     assert forall |addr| local1.segment_pages_used_total(sid).contains(addr)
         implies local2.segment_pages_used_total(sid).contains(addr)
     by {
         let pid = choose |pid| local1.segment_page_used(sid, pid).contains(addr);
         assert(local2.segment_page_used(sid, pid).contains(addr));
+        assert(local2.used_primary_set().contains(pid));
     }
     assert forall |addr| local2.segment_pages_range_total(sid).contains(addr)
         implies local1.segment_pages_range_total(sid).contains(addr)
     by {
         let pid = choose |pid| local2.segment_page_range(sid, pid).contains(addr);
         assert(local1.segment_page_range(sid, pid).contains(addr));
+        assert(local1.used_primary_set().contains(pid));
     }
     assert forall |addr| local1.segment_pages_range_total(sid).contains(addr)
         implies local2.segment_pages_range_total(sid).contains(addr)
     by {
         let pid = choose |pid| local1.segment_page_range(sid, pid).contains(addr);
         assert(local2.segment_page_range(sid, pid).contains(addr));
+        assert(local2.used_primary_set().contains(pid));
     }
 }
 
@@ -695,9 +696,12 @@ pub proof fn preserves_mem_chunk_good_on_transfer_to_capacity(local1: Local, loc
               requires local1.page_capacity(page_id) <= local2.page_capacity(page_id),
                   local1.block_size(page_id) == local2.block_size(page_id);
             assert(local2.segment_page_range(sid, page_id).contains(addr));
+            assert(local2.used_primary_set().contains(page_id));
         } else {
             assert(r1 * bs >= 0) by(nonlinear_arith) requires r1 >= 0, bs >= 0;
             assert(local2.segment_page_range(sid, page_id).contains(addr));
+            assert(local2.used_primary_set().contains(page_id));
+            assert( pages_range_total2.contains(addr) );
         }
     }
 
@@ -792,6 +796,7 @@ pub proof fn preserves_mem_chunk_good_on_transfer_back(local1: Local, local2: Lo
               requires local1.page_capacity(pid) <= local2.page_capacity(pid),
                   local1.block_size(pid) == local2.block_size(pid);
             assert(local2.segment_page_range(sid, pid).contains(addr));
+            assert(local2.used_primary_set().contains(pid));
 
             assert(false);
         }
@@ -861,6 +866,7 @@ pub proof fn preserves_mem_chunk_on_set_used(local1: Local, local2: Local, page_
           requires local1.page_capacity(page_id) <= local2.page_capacity(page_id),
               local1.block_size(page_id) == local2.block_size(page_id);
         assert(local2.segment_page_range(sid, page_id).contains(addr));
+        assert(local2.used_primary_set().contains(page_id));
     }
     assert(pages_range_total1.subset_of(pages_range_total2));
     assert(mem.os_rw_bytes().subset_of(
@@ -886,6 +892,7 @@ pub proof fn preserves_mem_chunk_on_set_used(local1: Local, local2: Local, page_
                 assert(false);
             }*/
         } else {
+            assert(local1.used_primary_set().contains(pid));
             assert(local1.segment_page_used(sid, pid).contains(addr));
             assert(local1.segment_pages_used_total(sid).contains(addr));
             assert(commit_bytes.contains(addr) && !decommit_bytes.contains(addr));
@@ -944,6 +951,7 @@ pub proof fn segment_mem_has_reserved_range(local: Local, page_id: PageId, new_c
     assert forall |addr| res_range.contains(addr) implies commit_bytes.contains(addr)
     by {
         start_offset_le_slice_size(blocksize);
+        assert(local.used_primary_set().contains(page_id));
         assert(local.segment_page_used(segment_id, page_id).contains(addr));
         assert(pages_used_total.contains(addr));
     } 

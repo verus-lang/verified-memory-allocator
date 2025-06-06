@@ -15,6 +15,8 @@ use crate::os_mem::*;
 
 verus!{
 
+broadcast use CommitMask::bytes_ensures;
+
 fn clock_now() -> i64 {
     let t = clock_gettime_monotonic();
     t.tv_sec.wrapping_mul(1000).wrapping_add( (((t.tv_nsec as u64) / 1000000) as i64) )

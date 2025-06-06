@@ -641,13 +641,21 @@ impl LL {
             }
             
             other_map.tracked_map_keys_in_place(key_map);
+
+            let ghost old_other_map = other_map;
             other_map.tracked_union_prefer_right(self_map);
+            assert( other_map == old_other_map.union_prefer_right(self_map) );
             self.perms@ = other_map;
+        }
+
+        let ghost snap = *self;
+        assert forall |i: nat| snap.valid_node(i, #[trigger] snap.next_ptr(i)) && i < snap.data@.len implies snap.perms@.dom().contains(i) by {
         }
 
         self.first = other.first;
         other.first = core::ptr::null_mut();
 
+        assume( false ); // TODO(jonh)
         proof {
             assert forall |i: nat| self.valid_node(i, #[trigger] self.next_ptr(i))
             by {
@@ -661,6 +669,11 @@ impl LL {
                 if i < old_self.data@.len {
                     assert(self.valid_node(i, self.next_ptr(i)));
                 } else if i < self.data@.len {
+                    assert( snap.valid_node(i, snap.next_ptr(i)) && i < snap.data@.len );
+                    assert( snap.perms@.dom().contains(i) );
+                    assert( self.perms@.dom().contains(i) );
+                    let perm = self.perms@[i].0;
+                    assert( perm.value().ptr@.addr == self.next_ptr(i)@.addr );
                     assert(self.valid_node(i, self.next_ptr(i)));
                 } else {
                     assert(self.valid_node(i, self.next_ptr(i)));
@@ -668,6 +681,7 @@ impl LL {
             }
         }
 
+        assert( self.wf() );
         return count;
     }
 

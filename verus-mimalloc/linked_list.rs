@@ -1213,10 +1213,12 @@ impl LL {
             set_nat_range(map1.len(), map1.len() + map2.len()),
             |k: nat| (k - map1.len()) as nat,
         ));
+        let hi = llgstr1.map.len() + llgstr2.map.len();
+        lemma_nat_range(llgstr1.map.len(), hi);
         map1.tracked_union_prefer_right(map2);
-        assert(map1.dom() =~= set_nat_range(0, 
-            llgstr1.map.len() + llgstr2.map.len()));
-        lemma_nat_range(0, llgstr1.map.len() + llgstr2.map.len());
+        lemma_nat_range(0, hi);
+        lemma_nat_range_len(0, hi);
+        assert(map1.dom() =~= set_nat_range(0,  hi));
         assert(map1.len() == llgstr1.map.len() + llgstr2.map.len());
         let tracked llgstr = LLGhostStateToReconvene {
             map: map1,
@@ -1340,15 +1342,34 @@ pub proof fn lemma_nat_range(lo: nat, hi: nat)
     requires
         lo <= hi,
     ensures
+        set_nat_range(lo, hi).congruent(ISet::new(|x:nat| lo<=x<hi)),
         set_nat_range(lo, hi).finite(),
+{
+    let fs = set_nat_range(lo, hi);
+    let is = ISet::new(|x:nat| lo<=x<hi);
+    assert forall |x| fs.contains(x) implies is.contains(x) by {
+    }
+    assert forall |x| is.contains(x) implies fs.contains(x) by {
+        assert(Set::int_range(lo as int, hi as int).contains(x as int));
+    }
+    assert(fs.congruent(is));
+
+}
+
+pub proof fn lemma_nat_range_len(lo: nat, hi: nat)
+    requires
+        lo <= hi,
+    ensures
         set_nat_range(lo, hi).len() == hi - lo,
     decreases
         hi - lo,
 {
+    lemma_nat_range(lo, hi);
     if lo == hi {
         assert(set_nat_range(lo, hi) =~= Set::empty());
     } else {
-        lemma_nat_range(lo, (hi - 1) as nat);
+        lemma_nat_range(lo, (hi-1) as nat);
+        lemma_nat_range_len(lo, (hi-1) as nat);
         assert(set_nat_range(lo, (hi - 1) as nat).insert((hi - 1) as nat) =~= set_nat_range(lo, hi));
     }
 }

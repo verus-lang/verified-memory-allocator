@@ -445,7 +445,7 @@ impl CommitMask {
             forall|j: int| 0 <= j < i ==> other.mask[j] == self.mask[j],
             forall|j: int| i < j < 8 ==> other.mask[j] == self.mask[j],
         ensures
-//             other@ == self@.union(ISet::new(|b: usize| b < 64 && is_bit_set(other.mask[i], b)).map(|b: usize| 64 * i + b)),
+            other.i_view() == self.i_view().union(ISet::new(|b: usize| b < 64 && is_bit_set(other.mask[i], b)).map(|b: usize| 64 * i + b)),
             other@ == self@.union(
                 Set::int_range(0, 64).map(|b:int| b as usize).filter(|b| is_bit_set(other.mask[i], b))
                 .map(|b: usize| 64 * i + b)),
@@ -584,7 +584,6 @@ impl CommitMask {
             idx + count <= COMMIT_MASK_BITS,
             old(self)@ == Set::<int>::empty(),
         ensures self@ == Set::int_range(idx as int, idx+count as int),
-//             ISet::new(|i: int| idx <= i < idx + count),
     {
         proof {
             const_facts();
@@ -600,16 +599,16 @@ impl CommitMask {
         if count == COMMIT_MASK_BITS as usize {
             self.create_full();
         } else if count == 0 {
-            assert(self@ =~= Set::int_range(idx as int, (idx+count) as int));
+            assert(self.i_view() =~= ISet::new(|i: int| idx <= i < idx + count));
         } else {
+            assert( self.infinite_tuple_view().is_empty() );
             let mut i = idx / usize::BITS as usize;
             let mut ofs: usize = idx % usize::BITS as usize;
             let mut bitcount = count;
             assert(ISet::new(|j: int| idx <= j < idx + (count - bitcount)) =~= ISet::empty());
             while bitcount > 0
                 invariant
-                    self@ == Set::int_range(idx as int, idx+(count-bitcount) as int),
-//                         ISet::new(|j: int| idx <= j < idx + (count - bitcount)),
+                    self.i_view() == ISet::new(|j: int| idx <= j < idx + (count - bitcount)),
                     ofs == if count == bitcount { idx % 64 } else { 0 },
                     bitcount > 0 ==> 64 * i + ofs == idx + (count - bitcount),
                     idx + count <= 512,
@@ -643,9 +642,7 @@ impl CommitMask {
                     let oofs = oofs@;
                     lemma_is_bit_set();
                     old_self@.lemma_change_one_entry(self, oi as int);
-                    assert(self@ == old_self@@.union(
-                            Set::int_range(0, 64).map(|b| b as usize).filter(|b| is_bit_set(self.mask[oi as int], b))
-                                .map(|b: usize| 64 * oi + b)));
+                    assert(self.i_view() == old_self@.i_view().union(ISet::new(|b: usize| b < 64 && is_bit_set(self.mask[oi as int], b)).map(|b: usize| 64 * oi + b)));
                     // TODO: a lot of duplicated proof structure here, should be able to
                     // somehow lift that structure out of the if-else
                     if oofs > 0 { // first iteration
@@ -717,25 +714,14 @@ impl CommitMask {
                         assert(ISet::new(|j: int| 64 * oi <= j < 64 * oi + 64)
                                =~= ISet::new(|b: usize| b < 64 && is_bit_set(self.mask[oi as int], b)).map(|b: usize| 64 * oi + b));
                     }
-
-                    let irange = ISet::int_range(idx as int, idx + (count - bitcount) as int);
-                    assert(self.i_view() =~= irange) by {
-                        assert forall |x| irange.contains(x) implies self.i_view().contains(x) by {
-                            let w = Self::uncombine(x);
-                            assert(Self::combine()(w)==x);
-                            assert( 0 <= w.0 < 8 && w.1 < 64 );
-                            assert( is_bit_set(self.mask[w.0], w.1) );
-                            assert(self.infinite_tuple_view().contains(w));
-                        }
-                        assert forall |x| self.i_view().contains(x) implies irange.contains(x) by {
-                            assume(false);
-                        }
-                    }
                 }
+                assert(self.i_view() =~= ISet::new(|j: int| idx <= j < idx + (count - bitcount)));
                 proof { self.view_equiv(); }
                 assert(self@ =~= Set::int_range(idx as int, idx + (count - bitcount) as int));
             }
         }
+        proof { self.view_equiv(); }
+        assert( self@ =~= Set::int_range(idx as int, idx+count as int) );
     }
 
     pub fn create_empty(&mut self)
@@ -756,8 +742,7 @@ impl CommitMask {
     }
 
     pub fn create_full(&mut self)
-        ensures self@ == Set::int_range(0, COMMIT_MASK_BITS as int),
-//         ISet::new(|i: int| 0 <= i < COMMIT_MASK_BITS),
+        ensures self.i_view() == ISet::new(|i: int| 0 <= i < COMMIT_MASK_BITS),
     {
         let mut i = 0;
         while i < 8
@@ -777,13 +762,13 @@ impl CommitMask {
                 assert(ISet::new(|t: (int, int)| 0 <= t.0 < 8 && 0 <= t.1 < 64).contains((i / 64, i % 64)));
             }
             assert(seq_set =~= bit_set);
-            assert(self@.congruent(ISet::int_range(0, COMMIT_MASK_BITS as int)) ) by {
-                assert forall |x| #![auto] ISet::int_range(0, COMMIT_MASK_BITS as int).contains(x)
-                    implies self@.contains(x) by {
-                    assert(seq_set.contains(x));
-                }
+
+            // Not sure why .map needs a witness now and didn't before.
+            assert forall |x| ISet::new(|i: int| 0 <= i < COMMIT_MASK_BITS).contains(x)
+                implies self.i_view().contains(x) by {
+                assert(self.infinite_tuple_view().contains(Self::uncombine(x)));
             }
-            assert(self@ =~= Set::int_range(0, COMMIT_MASK_BITS as int));
+            assert(self.i_view() == ISet::new(|i: int| 0 <= i < COMMIT_MASK_BITS));
         }
     }
 

@@ -277,10 +277,60 @@ impl CommitMask {
         }
     }
 
+//     pub open spec fn elt_to_addrs(elt: int, segment_id: SegmentId) -> (addrs: Set<int>)
+//     {
+//         self@.product(|elt| Self::elt_to_addrs(elt, segment_id))
+//         Set::int_range(0, COMMIT_SIZE as int).map(|r| COMMIT_SIZE*elt + segment_start(segment_id) + r)
+//     }
+
+    pub open spec fn i_bytes(&self, segment_id: SegmentId) -> ISet<int> {
+        ISet::<int>::new(|addr: int|
+            self@.contains(
+                (addr - segment_start(segment_id)) / COMMIT_SIZE as int
+            )
+        )
+    }
+
+    // TODO(jonh): travis: opaque but open? Huh?
     #[verifier::opaque]
     pub open spec fn bytes(&self, segment_id: SegmentId) -> Set<int> {
-        self@.map(|addr: int|
-                (addr - segment_start(segment_id)) / COMMIT_SIZE as int)
+        self.i_bytes(segment_id).to_finite()
+    }
+
+    // Need this for bytes definition to be usuable
+    pub broadcast proof fn bytes_ensures(&self, segment_id: SegmentId)
+    ensures
+        #![trigger self.bytes(segment_id)]
+        self.bytes(segment_id).congruent(self.i_bytes(segment_id))
+    {
+        let fset = self@.product(|elt: int|
+                Set::int_range(0, COMMIT_SIZE as int).map(|r| elt*COMMIT_SIZE+segment_start(segment_id)+r));
+        let iset = self.i_bytes(segment_id);
+
+        assert forall |addr| iset.contains(addr) implies fset.contains(addr) by {
+            let off = addr - segment_start(segment_id);
+            let elt = off/(COMMIT_SIZE as int);
+            let r = off - elt * COMMIT_SIZE;
+            assert( Set::int_range(0, COMMIT_SIZE as int).contains(r) );    // witness to product.map
+        }
+        fset.congruent_infiniteness(iset);
+
+            // Can't do this proof by surj_on because that's private to vstd::set. :v( Others may
+            // someday want to prove finiteness... TODO(jonh): make discussion?
+//         assert(self.i_bytes(segment_id).finite()) by {
+//             let (f1, ub1) = choose|f: spec_fn(int) -> nat, ub: nat| #[trigger]
+//                 vstd::set::trigger_finite(f, ub) && vstd::set::surj_on(f, self@) && (forall|e| self@.contains(e) ==> f(e) < ub);
+//             assert( vstd::set::surj_on(f1, self@) && (forall|e| self@.contains(e) ==> f(e) < ub1) );
+// 
+//             let base = segment_start(segment_id);
+//             let f = |addr| f1((addr-base) / COMMIT_SIZE as int) * COMMIT_SIZE + base;
+//             let ub = f(ub1) + COMMIT_SIZE;
+// 
+//             assert(vstd::set::surj_on(f, self.i_bytes(segment_id)));
+//             assert forall |a| self.i_bytes(segment_id).contains(a) ==> f(a) < ub by {}
+//             assert(vstd::set::trigger_finite(f, ub));
+//         }
+        reveal(CommitMask::bytes);
     }
 
     pub fn empty() -> (cm: CommitMask)
@@ -514,6 +564,9 @@ impl CommitMask {
             }
         }
         assert( other@ == self@.union(fthing) );    // trigger extn we're not getting from assert-by
+
+        // Fun with discussion #1534
+        assert( other.i_view() == self.i_view().union(ISet::new(|b: usize| b < 64 && is_bit_set(other.mask[i], b)).map(|b: usize| 64 * i + b)) );
     }
     
 //     proof fn lemma_change_one_entry(&self, other: &Self, i: int)
@@ -972,6 +1025,7 @@ pub proof fn set_int_range_commit_size(sid: SegmentId, mask: CommitMask)
     ensures set_int_range(segment_start(sid), segment_start(sid) + COMMIT_SIZE) <= mask.bytes(sid)
 {
     reveal(CommitMask::bytes);
+    broadcast use CommitMask::bytes_ensures;
 }
 
 

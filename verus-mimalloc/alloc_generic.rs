@@ -299,7 +299,27 @@ fn page_free_list_extend(
     );
     let tracked block_tokens = block_tokens.into_map();
     proof { local.thread_token = _thread_token; local.checked_token = _checked_token; }
-    assert( block_tokens.dom().finite() );
+
+    proof {
+        let old_num_blocks = cap_nat as nat;
+        let new_num_blocks = cap_nat as nat + extend_nat as nat;
+        let block_size = bsize as nat;
+        let f_block_tokens_dom = set_nat_range(old_num_blocks, new_num_blocks).map(|idx|
+            BlockId{page_id, idx, block_size, slice_idx: BlockId::get_slice_idx(page_id, idx, block_size)});
+        let block_tokens_dom = ISet::new(|block_id: BlockId|
+                        block_id.page_id == page_id
+                          && old_num_blocks <= block_id.idx < new_num_blocks
+                          && block_id.block_size == block_size
+                          && block_id.slice_idx_is_right());
+        lemma_nat_range(old_num_blocks, new_num_blocks);
+        assert forall |b| block_tokens_dom.contains(b) implies f_block_tokens_dom.contains(b) by {
+            assert( set_nat_range(old_num_blocks, new_num_blocks).contains(b.idx) );    // witness to map
+        }
+        // why wouldn't this auto-trigger? Oh it's not in the broadcast group.
+        f_block_tokens_dom.congruent_infiniteness(block_tokens.dom());
+        
+        assert( block_tokens.dom().finite() );
+    }
     let tracked mut block_tokens = Map::tracked_map_keys(block_tokens.tracked_to_finite(),
         Map::<int, BlockId>::new(
           Set::int_range(cap_nat as int, cap_nat + extend_nat as int),
@@ -359,9 +379,24 @@ fn page_free_list_extend(
             //assert(block_start_at(page_id, block_size, block_id.idx as int)
             //  < segment_start(segment_id) + (block_id.slice_idx * SLICE_SIZE) + SLICE_SIZE);
 
+            assert(is_block_ptr1(
+                block_start(block_tokens.index(i).key()),
+                block_tokens.index(i).key(),
+            )) by {
+                assume(false); // TODO(jonh): left off here
+            }
         }
     }
 
+        // How do I even write a proof about this page_inner lambda variable that's 'inside' the transition?
+//     proof {
+//         let ghost sself = page_inner.free;
+//         let cap = cap_nat;
+//         let extend = extend_nat;
+//         let ghost tokens = block_tokens;
+//         assert forall |i: int| cap <= i < cap + extend ==> old(tokens).index(i).instance_id() == old(sself).instance().id() by {}
+//     }
+    assume(false);
     page_get_mut_inner!(page_ptr, local, page_inner => {
         page_inner.free.prepend_contiguous_blocks(
             start, last, bsize,

@@ -54,6 +54,7 @@ proof fn set_mismatch(s1:Set<nat>, s2:Set<nat>, missing:nat)
 /* TODO: These next two should be derived from the set_int_range and lemma_int_range in 
  *       set_lib.rs, but it's surprisingly painful to do so */
 
+// TODO(jonh): duplicated in linked_list
 /// Creates a finite set of nats in the range [lo, hi).
 pub open spec fn set_nat_range(lo: nat, hi: nat) -> Set<nat> {
     Set::int_range(lo as int, hi as int).map(|i| i as nat)

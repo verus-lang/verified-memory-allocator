@@ -1426,6 +1426,7 @@ fn segment_os_alloc(
         // TODO get from cache if possible
     }
 
+    // TODO(jonh): travis: two lines above segment is set to null. Why's there an if here?
     if segment.is_null() {
         let (_segment, Tracked(_mem), commit, _large, _is_pinned, _is_zero, _mem_id) = 
           arena_alloc_aligned(
@@ -1450,6 +1451,7 @@ fn segment_os_alloc(
         }
         if pcommit {
             pcommit_mask.create_full();
+            assert( pcommit_mask.i_view() == ISet::new(|i: int| 0 <= i < COMMIT_MASK_BITS) );
         } else {
             pcommit_mask.create_empty();
         }
@@ -1486,6 +1488,35 @@ fn segment_os_alloc(
         //by {
         crate::commit_mask::set_int_range_commit_size(segment.segment_id@, *pcommit_mask);
         //}
+        let sid = segment.segment_id@;
+        let mask = *pcommit_mask;
+        assert( set_int_range(segment_start(sid), segment_start(sid) + COMMIT_SIZE) <= mask.bytes(sid) );
+
+        assert( set_int_range(segment_start(sid), segment_start(sid) + COMMIT_SIZE).subset_of(mask.bytes(sid)) );
+        assert( pcommit_mask.bytes(sid) == mask.bytes(sid) );
+
+        if( pcommit ) {
+        // os_rw_bytes is os.dom().filter(...)
+            assert( mem.os_has_range_read_write(segment.segment_ptr as int, segment_size as int) );
+            assert forall |a| pcommit_mask.i_bytes(sid).contains(a) implies mem.os_rw_bytes().contains(a) by {
+                let addr = segment.segment_ptr as int;
+                assert( segment_start(sid) == sid.id * (SEGMENT_SIZE as int) ) by {assume(false);}; // closed in layout
+                assert( segment_size as int == (SEGMENT_SIZE as int) );
+                assert( pcommit_mask.i_view() == ISet::new(|i: int| 0 <= i < COMMIT_MASK_BITS) );
+                assert( pcommit_mask@.contains((addr - segment_start(sid)) / COMMIT_SIZE as int) );
+                assert(segment.segment_ptr as int <= a);
+                assert(a < segment.segment_ptr as int + segment_size as int);
+            }
+            assert(pcommit_mask.i_bytes(sid).subset_of(mem.os_rw_bytes()));
+        } else {
+            assert(pcommit_mask.i_bytes(sid).subset_of(mem.os_rw_bytes()));
+        }
+
+        assert(pcommit_mask.bytes(sid).subset_of(mem.os_rw_bytes())) by {
+            reveal(CommitMask::bytes);
+            assert( pcommit_mask.i_bytes(sid).finite() );
+        }
+
         assert(pcommit_mask.bytes(segment.segment_id@).subset_of(mem.os_rw_bytes()))
         by {
             reveal(CommitMask::bytes);

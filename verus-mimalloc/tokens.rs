@@ -1665,6 +1665,7 @@ tokenized_state_machine!{ Mim {
 
     #[inductive(reserve_uniq_identifier)]
     fn reserve_uniq_identifier_inductive(pre: Self, post: Self) {
+        assert( (pre.heap_shared_access.dom() + pre.reserved_uniq).finite() );  // TODO(jonh): unstable here
         lemma_heap_get_unused_uniq_field(pre.heap_shared_access.dom() + pre.reserved_uniq);
         let u = heap_get_unused_uniq_field(pre.heap_shared_access.dom() + pre.reserved_uniq);
         assert forall |hid1: HeapId, hid2: HeapId|

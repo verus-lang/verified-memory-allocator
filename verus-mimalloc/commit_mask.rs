@@ -3,11 +3,10 @@ use crate::config::*;
 use crate::tokens::*;
 use crate::layout::*;
 use crate::types::*;
-use vstd::set::set_int_range;
 
 verus!{
 
-proof fn lemma_map_distribute<S,T>(s1: Set<S>, s2: Set<S>, f: spec_fn(S) -> T)
+proof fn lemma_map_distribute<S,T>(s1: ISet<S>, s2: ISet<S>, f: spec_fn(S) -> T)
     ensures s1.union(s2).map(f) == s1.map(f).union(s2.map(f))
 {
     assert forall|x:T| #![auto] s1.map(f).union(s2.map(f)).contains(x) implies s1.union(s2).map(f).contains(x) by {
@@ -21,9 +20,9 @@ proof fn lemma_map_distribute<S,T>(s1: Set<S>, s2: Set<S>, f: spec_fn(S) -> T)
 }
 
 proof fn lemma_map_distribute_auto<S,T>()
-    ensures forall|s1: Set<S>, s2: Set<S>, f: spec_fn(S) -> T| s1.union(s2).map(f) == #[trigger] s1.map(f).union(s2.map(f))
+    ensures forall|s1: ISet<S>, s2: ISet<S>, f: spec_fn(S) -> T| s1.union(s2).map(f) == #[trigger] s1.map(f).union(s2.map(f))
 {
-    assert forall|s1: Set<S>, s2: Set<S>, f: spec_fn(S) -> T| s1.union(s2).map(f) == #[trigger] s1.map(f).union(s2.map(f)) by {
+    assert forall|s1: ISet<S>, s2: ISet<S>, f: spec_fn(S) -> T| s1.union(s2).map(f) == #[trigger] s1.map(f).union(s2.map(f)) by {
         lemma_map_distribute(s1, s2, f);
     }
 }
@@ -194,61 +193,11 @@ pub struct CommitMask {
 }
 
 impl CommitMask {
-    pub closed spec fn all_tuples() -> Set<(int,usize)>
-    {
-        Set::int_range(0, 8)
-            .product(|t0: int| Set::int_range(0, 64).map(|t1| (t0, t1 as usize)))
-    }
-
-    spec fn combine() -> spec_fn((int, usize)) -> int {
-        |t: (int, usize)| t.0 * 64 + t.1
-    }
-
-    spec fn uncombine(x: int) -> (t: (int, usize))
-    {
-        (x/64, (x%64) as usize)
-    }
-
-    closed spec fn finite_tuple_view(&self) -> Set<(int, usize)> {
-        Self::all_tuples()
-            .filter(|t: (int, usize)| is_bit_set(self.mask[t.0], t.1))
-    }
-
-    pub closed spec fn view(&self) -> Set<int> {
-        Self::all_tuples()
-            .filter(|t: (int, usize)| is_bit_set(self.mask[t.0], t.1))
-            .map(Self::combine())
-
-    }
-
-    // The old infinite notation that doesn't require as much witness effort in proofs
-    closed spec fn infinite_tuple_view(&self) -> ISet<(int, usize)> {
+    pub closed spec fn view(&self) -> ISet<int> {
         ISet::new(|t: (int, usize)|
                  0 <= t.0 < 8 && t.1 < 64
-                 && is_bit_set(self.mask[t.0], t.1))
-    }
-
-    pub closed spec fn i_view(&self) -> ISet<int> {
-        self.infinite_tuple_view().map(Self::combine())
-    }
-
-    // This is a bit of a clunky port from the old representation. It might be nicer to update the
-    // lemma that uses this to just prove directly against the new finite-Set-based definition.
-    proof fn view_equiv(&self)
-    ensures self@.congruent(self.i_view())
-    {
-        // Prove congruence before the common map step
-        let a = Self::all_tuples()
-            .filter(|t: (int, usize)| is_bit_set(self.mask[t.0], t.1));
-        let b = ISet::new(|t: (int, usize)|
-                 0 <= t.0 < 8 && t.1 < 64
-                 && is_bit_set(self.mask[t.0], t.1));
-        assert forall |x| b.contains(x) implies a.contains(x) by {
-            assert( Set::int_range(0, 64).contains(x.1 as int) );   // witness to product fn
-            let prodfn = |t0: int| Set::int_range(0, 64).map(|t1| (t0, t1 as usize));
-            assert( prodfn(x.0).contains(x) );  // witness to filter
-        }
-        assert( a.congruent(b) );   // not sure what this triggers, but...
+                 && is_bit_set(self.mask[t.0], t.1)
+        ).map(|t: (int, usize)| t.0 * 64 + t.1)
     }
 
     proof fn lemma_view(&self)
@@ -272,16 +221,8 @@ impl CommitMask {
                      && is_bit_set(self.mask[t.0], t.1)
             ).contains((a, b))) by (nonlinear_arith)
                 requires 0 <= a < 8 && b < 64 && is_bit_set(self.mask[a], b);
-            self.view_equiv();
-            assert( self@.contains(a * 64 + b) );
         }
     }
-
-//     pub open spec fn elt_to_addrs(elt: int, segment_id: SegmentId) -> (addrs: Set<int>)
-//     {
-//         self@.product(|elt| Self::elt_to_addrs(elt, segment_id))
-//         Set::int_range(0, COMMIT_SIZE as int).map(|r| COMMIT_SIZE*elt + segment_start(segment_id) + r)
-//     }
 
     pub open spec fn i_bytes(&self, segment_id: SegmentId) -> ISet<int> {
         ISet::<int>::new(|addr: int|
@@ -291,19 +232,33 @@ impl CommitMask {
         )
     }
 
-    // TODO(jonh): travis: opaque but open? Huh?
-    #[verifier::opaque]
-    pub open spec fn bytes(&self, segment_id: SegmentId) -> Set<int> {
-        self.i_bytes(segment_id).to_finite()
+    // An explicit construction of view to prove view is finite
+    pub closed spec fn finite_view(&self) -> Set<int> {
+        Set::int_range(0, 8).product(|t0| Set::int_range(0, 64).map(|t1| (t0, t1 as usize)))
+            .filter(|t: (int, usize)| is_bit_set(self.mask[t.0], t.1))
+            .map(|t: (int, usize)| t.0 * 64 + t.1)
     }
 
-    // Need this for bytes definition to be usuable
-    pub broadcast proof fn bytes_ensures(&self, segment_id: SegmentId)
-    ensures
-        #![trigger self.bytes(segment_id)]
-        self.bytes(segment_id).congruent(self.i_bytes(segment_id))
+    pub proof fn finite_view_ensures(&self)
+    ensures self@.congruent(self.finite_view())
     {
-        let fset = self@.product(|elt: int|
+        let ipre = ISet::new(|t: (int, usize)|
+                 0 <= t.0 < 8 && t.1 < 64
+                 && is_bit_set(self.mask[t.0], t.1));
+        let fpre = Set::int_range(0, 8).product(|t0| Set::int_range(0, 64).map(|t1| (t0, t1 as usize)))
+            .filter(|t: (int, usize)| is_bit_set(self.mask[t.0], t.1));
+        assert forall |a| ipre.contains(a) implies fpre.contains(a) by {
+            assert( Set::int_range(0, 8).contains(a.0) );   // witness to product
+            assert( Set::int_range(0, 64).contains(a.1 as int) ); // witness to map
+        }
+        assert( ipre.congruent(fpre) ); // trigger filter congruence
+    }
+
+    pub broadcast proof fn i_bytes_ensures(&self, segment_id: SegmentId)
+    ensures #![trigger self.bytes(segment_id)] self.i_bytes(segment_id).finite()
+    {
+        self.finite_view_ensures();
+        let fset = self.finite_view().product(|elt: int|
                 Set::int_range(0, COMMIT_SIZE as int).map(|r| elt*COMMIT_SIZE+segment_start(segment_id)+r));
         let iset = self.i_bytes(segment_id);
 
@@ -333,14 +288,23 @@ impl CommitMask {
         reveal(CommitMask::bytes);
     }
 
+    #[verifier::opaque]
+    pub open spec fn bytes(&self, segment_id: SegmentId) -> Set<int> {
+        ISet::<int>::new(|addr: int|
+            self@.contains(
+                (addr - segment_start(segment_id)) / COMMIT_SIZE as int
+            )
+        ).to_finite()
+    }
+
     pub fn empty() -> (cm: CommitMask)
-        ensures cm@ == Set::<int>::empty()
+        ensures cm@ == ISet::<int>::empty()
     {
         let res = CommitMask { mask: [ 0, 0, 0, 0, 0, 0, 0, 0 ] };
         proof {
             lemma_is_bit_set();
             res.lemma_view();
-            assert(res@ =~= Set::<int>::empty());
+            assert(res@ =~= ISet::<int>::empty());
         }
         res
     }
@@ -464,30 +428,6 @@ impl CommitMask {
         }
     }
 
-    proof fn lemma_foo(f: spec_fn((int, usize))->bool)
-    ensures
-        Set::congruent(
-            Self::all_tuples().filter(f),
-            ISet::new(|t: (int, usize)| 0 <= t.0 < 8 && t.1 < 64 && f(t)))
-    {
-        let fset = Self::all_tuples().filter(f);
-        let iset = ISet::new(|t: (int, usize)| 0 <= t.0 < 8 && t.1 < 64 && f(t));
-        assert forall |x| iset.contains(x) implies fset.contains(x) by {
-            // witness our way through product and map
-            assert(Set::int_range(0, 8).contains(x.0));
-            assert((|t0: int| Set::int_range(0, 64))(x.0).contains(x.1 as int));
-        }
-    }
-
-    proof fn hard_choose<A>(pred: spec_fn(A) -> bool) -> (a: A)
-    requires exists |a| #[trigger] pred(a)
-    ensures a == choose |a| #[trigger] pred(a)
-    {
-        choose |a| #[trigger] pred(a)
-    }
-
-    // self has no mask bits for i; self and other agree on everything except i.
-    // ==> other's view is the union of self's view and other's view just for i.
     proof fn lemma_change_one_entry(&self, other: &Self, i: int)
         requires
             0 <= i < 8,
@@ -495,10 +435,7 @@ impl CommitMask {
             forall|j: int| 0 <= j < i ==> other.mask[j] == self.mask[j],
             forall|j: int| i < j < 8 ==> other.mask[j] == self.mask[j],
         ensures
-            other.i_view() == self.i_view().union(ISet::new(|b: usize| b < 64 && is_bit_set(other.mask[i], b)).map(|b: usize| 64 * i + b)),
-            other@ == self@.union(
-                Set::int_range(0, 64).map(|b:int| b as usize).filter(|b| is_bit_set(other.mask[i], b))
-                .map(|b: usize| 64 * i + b)),
+            other@ == self@.union(ISet::new(|b: usize| b < 64 && is_bit_set(other.mask[i], b)).map(|b: usize| 64 * i + b)),
     {
         let s_un = ISet::new(|b: usize| b < 64 && is_bit_set(other.mask[i], b));
         let f_un = |b: usize| 64 * i + b;
@@ -512,19 +449,7 @@ impl CommitMask {
         assert(s_full =~= s1.union(s2).union(s3));
         assert(s2 =~= ISet::empty()) by { lemma_is_bit_set(); }
         lemma_map_distribute_auto::<(int,usize),int>();
-        assert(s_full.map(f) =~= s1.map(f).union(s2.map(f)).union(s3.map(f))) by {
-            assert forall |x| #![auto] s1.map(f).union(s2.map(f)).union(s3.map(f)).contains(x)
-                implies s_full.map(f).contains(x) by {
-                // propagate triggers from map invocations to s_full.map
-                if s1.map(f).contains(x) {
-                    assert(s_full.contains(choose|w| s1.contains(w) && f(w)==x));
-                } else if s2.map(f).contains(x) {
-                    assert(s_full.contains(choose|w| s2.contains(w) && f(w)==x));
-                } else {
-                    assert(s_full.contains(choose|w| s3.contains(w) && f(w)==x));
-                }
-            }
-        }
+        assert(s_full.map(f) =~= s1.map(f).union(s2.map(f)).union(s3.map(f)));
         assert(s_full_o =~= s_full.union(s2o));
         assert forall|x| #![auto] s_un.map(f_un).contains(x) implies s2o.map(f).contains(x) by {
             assert(s2o.contains((i, choose|y| s_un.contains(y) && f_un(y) == x)));
@@ -534,109 +459,13 @@ impl CommitMask {
             assert(ISet::new(|b: usize| b < 64 && is_bit_set(other.mask[i], b)).contains(y.1));
         };
         assert(s_un.map(f_un) =~= s2o.map(f));
-
-        let ubase = ISet::new(|b: usize| b < 64 && is_bit_set(other.mask[i], b));
-        let ufn = |b: usize| 64 * i + b;
-        let uthing = ubase.map(ufn);
-        // original conclusion in ISet space
-        // Needs new triggers for Set::maps; not sure why. :v(
-        assert( other.i_view().congruent(self.i_view().generic_union(ISet::new(|b: usize| b < 64 && is_bit_set(other.mask[i], b)).map(|b: usize| 64 * i + b))) ) by {
-            assert forall |x| #![auto] self.i_view().generic_union(uthing).contains(x)
-                implies other.i_view().contains(x) by {
-                if self.i_view().contains(x) {
-                    let w = choose |w| self.infinite_tuple_view().contains(w) && Self::combine()(w)==x;
-                    assert(other.infinite_tuple_view().contains(w));
-                } else {
-                    let w = (i, choose |wb| ubase.contains(wb) && ufn(wb)==x);
-                    assert(other.infinite_tuple_view().contains(w));
-                }
-            }
-        }
-        // updated conclusion in finite Set space
-        self.view_equiv();
-        other.view_equiv();
-        let fbase = Set::int_range(0, 64).map(|b:int| b as usize).filter(|b| is_bit_set(other.mask[i], b));
-        let fthing = fbase.map(ufn);
-        assert( ubase.congruent(fbase) ) by {
-            assert forall |x| ubase.contains(x) implies fbase.contains(x) by {
-                // witness for filter
-                assert( Set::int_range(0, 64).contains(x as int) );
-            }
-        }
-        assert( other@ == self@.union(fthing) );    // trigger extn we're not getting from assert-by
-
-        // Fun with discussion #1534
-        assert( other.i_view() == self.i_view().union(ISet::new(|b: usize| b < 64 && is_bit_set(other.mask[i], b)).map(|b: usize| 64 * i + b)) );
     }
-    
-//     proof fn lemma_change_one_entry(&self, other: &Self, i: int)
-//         requires
-//             0 <= i < 8,
-//             self.mask[i] == 0,
-//             forall|j: int| 0 <= j < i ==> other.mask[j] == self.mask[j],
-//             forall|j: int| i < j < 8 ==> other.mask[j] == self.mask[j],
-//         ensures
-//             other@ == self@.union(
-// //                 ISet::new(|b: usize| b < 64 && is_bit_set(other.mask[i], b))
-//                 Set::int_range(0, 64).map(|b:int| b as usize).filter(|b| is_bit_set(other.mask[i], b))
-//                 .map(|b: usize| 64 * i + b)),
-//     {
-//         let s_un: Set<usize> = Set::int_range(0, 64).map(|bi| bi as usize).filter(|b| is_bit_set(other.mask[i], b));
-//         let i_un = ISet::new(|b: usize| b < 64 && is_bit_set(other.mask[i], b));
-//         assert( Set::congruent(s_un, i_un) ) by {
-//             assert forall |x| i_un.contains(x) implies s_un.contains(x) by {
-//                 assert(Set::int_range(0, 64).contains(x as int));   // witness to map
-//             }
-//         }
-// 
-//         let fn_s = |t: (int, usize)| is_bit_set(self.mask[t.0], t.1);
-//         let s_full = Self::all_tuples().filter(fn_s);
-//         let fn_o = |t: (int, usize)| is_bit_set(other.mask[t.0], t.1);
-//         let s_full_o = Self::all_tuples().filter(fn_o);
-// //         let i_full = ISet::new(|t: (int, usize)| 0 <= t.0 < 8 && t.1 < 64 && is_bit_set(self.mask[t.0], t.1));
-//         Self::lemma_foo(|t: (int, usize)| is_bit_set(self.mask[t.0], t.1));
-//         Self::lemma_foo(|t: (int, usize)| is_bit_set(other.mask[t.0], t.1));
-//         assert(
-//                 ISet::new(|t: (int, usize)| 0 <= t.0 < 8 && t.1 < 64 && is_bit_set(self.mask[t.0], t.1))
-//             ==
-//                 ISet::new(|t: (int, usize)| 0 <= t.0 < 8 && t.1 < 64 && is_bit_set(other.mask[t.0], t.1))
-//             );
-//         assert( Set::congruent(s_full,
-//                 ISet::new(|t: (int, usize)| 0 <= t.0 < 8 && t.1 < 64 && is_bit_set(other.mask[t.0], t.1))) );
-//         let s1 = Self::all_tuples().filter(|t: (int, usize)| t.0 < i && is_bit_set(self.mask[t.0], t.1));
-//         assert( Set::congruent(s1,
-//                 ISet::new(|t: (int, usize)| 0 <= t.0 < i && t.1 < 64 && is_bit_set(self.mask[t.0], t.1))) );
-//         let s2 = Self::all_tuples().filter(|t: (int, usize)| t.0 == i && is_bit_set(self.mask[i], t.1));
-//         assert( Set::congruent(s2,
-//                 ISet::new(|t: (int, usize)| t.0 == i && t.1 < 64 && is_bit_set(self.mask[i], t.1))) );
-//         let s2o = Self::all_tuples().filter(|t: (int, usize)| t.0 == i && is_bit_set(other.mask[i], t.1));
-//         assert( Set::congruent(s2o,
-//                 ISet::new(|t: (int, usize)| t.0 == i && t.1 < 64 && is_bit_set(other.mask[i], t.1))) );
-//         let s3 = Self::all_tuples().filter(|t: (int, usize)| i < t.0 && is_bit_set(self.mask[t.0], t.1));
-//         assert( Set::congruent(s3,
-//                 ISet::new(|t: (int, usize)| i <  t.0 < 8 && t.1 < 64 && is_bit_set(self.mask[t.0], t.1))) );
-//         assert(s_full =~= s1.union(s2).union(s3));
-//         assert(s2 =~= Set::empty()) by { lemma_is_bit_set(); }
-//         lemma_map_distribute_auto::<(int,usize),int>();
-//         let f = |t: (int, usize)| t.0 * 64 + t.1;
-//         assert(s_full.map(f) =~= s1.map(f).union(s2.map(f)).union(s3.map(f)));
-//         assert(s_full_o =~= s_full.union(s2o));
-//         let f_un = |b: usize| 64 * i + b;
-//         assert forall|x| #![auto] s_un.map(f_un).contains(x) implies s2o.map(f).contains(x) by {
-//             assert(s2o.contains((i, choose|y| s_un.contains(y) && f_un(y) == x)));
-//         };
-//         assert forall|x| #![auto] s2o.map(f).contains(x) implies s_un.map(f_un).contains(x) by {
-//             let y = choose|y| s2o.contains(y) && f(y) == x;
-//             assert(ISet::new(|b: usize| b < 64 && is_bit_set(other.mask[i], b)).contains(y.1));
-//         };
-//         assert(s_un.map(f_un) =~= s2o.map(f));
-//     }
 
     pub fn create(&mut self, idx: usize, count: usize)
         requires
             idx + count <= COMMIT_MASK_BITS,
-            old(self)@ == Set::<int>::empty(),
-        ensures self@ == Set::int_range(idx as int, idx+count as int),
+            old(self)@ == ISet::<int>::empty(),
+        ensures self@ == ISet::new(|i: int| idx <= i < idx + count),
     {
         proof {
             const_facts();
@@ -652,16 +481,15 @@ impl CommitMask {
         if count == COMMIT_MASK_BITS as usize {
             self.create_full();
         } else if count == 0 {
-            assert(self.i_view() =~= ISet::new(|i: int| idx <= i < idx + count));
+            assert(self@ =~= ISet::new(|i: int| idx <= i < idx + count));
         } else {
-            assert( self.infinite_tuple_view().is_empty() );
             let mut i = idx / usize::BITS as usize;
             let mut ofs: usize = idx % usize::BITS as usize;
             let mut bitcount = count;
             assert(ISet::new(|j: int| idx <= j < idx + (count - bitcount)) =~= ISet::empty());
             while bitcount > 0
                 invariant
-                    self.i_view() == ISet::new(|j: int| idx <= j < idx + (count - bitcount)),
+                    self@ == ISet::new(|j: int| idx <= j < idx + (count - bitcount)),
                     ofs == if count == bitcount { idx % 64 } else { 0 },
                     bitcount > 0 ==> 64 * i + ofs == idx + (count - bitcount),
                     idx + count <= 512,
@@ -695,7 +523,7 @@ impl CommitMask {
                     let oofs = oofs@;
                     lemma_is_bit_set();
                     old_self@.lemma_change_one_entry(self, oi as int);
-                    assert(self.i_view() == old_self@.i_view().union(ISet::new(|b: usize| b < 64 && is_bit_set(self.mask[oi as int], b)).map(|b: usize| 64 * oi + b)));
+                    assert(self@ == old_self@@.union(ISet::new(|b: usize| b < 64 && is_bit_set(self.mask[oi as int], b)).map(|b: usize| 64 * oi + b)));
                     // TODO: a lot of duplicated proof structure here, should be able to
                     // somehow lift that structure out of the if-else
                     if oofs > 0 { // first iteration
@@ -768,17 +596,13 @@ impl CommitMask {
                                =~= ISet::new(|b: usize| b < 64 && is_bit_set(self.mask[oi as int], b)).map(|b: usize| 64 * oi + b));
                     }
                 }
-                assert(self.i_view() =~= ISet::new(|j: int| idx <= j < idx + (count - bitcount)));
-                proof { self.view_equiv(); }
-                assert(self@ =~= Set::int_range(idx as int, idx + (count - bitcount) as int));
+                assert(self@ =~= ISet::new(|j: int| idx <= j < idx + (count - bitcount)));
             }
         }
-        proof { self.view_equiv(); }
-        assert( self@ =~= Set::int_range(idx as int, idx+count as int) );
     }
 
     pub fn create_empty(&mut self)
-        ensures self@ == Set::<int>::empty(),
+        ensures self@ == ISet::<int>::empty(),
     {
         let mut i = 0;
         while i < 8
@@ -790,12 +614,12 @@ impl CommitMask {
         proof {
             lemma_is_bit_set();
             self.lemma_view();
-            assert(self@ =~= Set::<int>::empty());
+            assert(self@ =~= ISet::<int>::empty());
         }
     }
 
     pub fn create_full(&mut self)
-        ensures self.i_view() == ISet::new(|i: int| 0 <= i < COMMIT_MASK_BITS),
+        ensures self@ == ISet::new(|i: int| 0 <= i < COMMIT_MASK_BITS),
     {
         let mut i = 0;
         while i < 8
@@ -815,13 +639,7 @@ impl CommitMask {
                 assert(ISet::new(|t: (int, int)| 0 <= t.0 < 8 && 0 <= t.1 < 64).contains((i / 64, i % 64)));
             }
             assert(seq_set =~= bit_set);
-
-            // Not sure why .map needs a witness now and didn't before.
-            assert forall |x| ISet::new(|i: int| 0 <= i < COMMIT_MASK_BITS).contains(x)
-                implies self.i_view().contains(x) by {
-                assert(self.infinite_tuple_view().contains(Self::uncombine(x)));
-            }
-            assert(self.i_view() == ISet::new(|i: int| 0 <= i < COMMIT_MASK_BITS));
+            assert(self@ =~= ISet::new(|i: int| 0 <= i < COMMIT_MASK_BITS));
         }
     }
 
@@ -954,7 +772,7 @@ impl CommitMask {
     }
 
     pub fn is_empty(&self) -> (b: bool)
-    ensures b == (self@ == Set::<int>::empty())
+    ensures b == (self@ == ISet::<int>::empty())
     {
         let mut i = 0;
         while i < 8
@@ -974,13 +792,13 @@ impl CommitMask {
         proof {
             lemma_is_bit_set();
             self.lemma_view();
-            assert(self@ =~= Set::<int>::empty());
+            assert(self@ =~= ISet::<int>::empty());
         }
         return true;
     }
 
     pub fn is_full(&self) -> (b: bool)
-        ensures b == (self@ == Set::int_range(0, COMMIT_MASK_BITS as int)),
+    ensures b == (self@ == ISet::new(|i: int| 0 <= i < COMMIT_MASK_BITS))
     {
         let mut i = 0;
         while i < 8
@@ -1014,7 +832,7 @@ impl CommitMask {
                 assert(0 <= u < 64);
                 assert(self@.contains(t * 64 + u));
             }
-            assert(self@ =~= Set::int_range(0, COMMIT_MASK_BITS as int));
+            assert(self@ =~= ISet::new(|i: int| 0 <= i < COMMIT_MASK_BITS));
         }
         return true;
     }
@@ -1022,10 +840,10 @@ impl CommitMask {
 
 pub proof fn set_int_range_commit_size(sid: SegmentId, mask: CommitMask)
     requires mask@.contains(0)
-    ensures set_int_range(segment_start(sid), segment_start(sid) + COMMIT_SIZE) <= mask.bytes(sid)
+    ensures ISet::int_range(segment_start(sid), segment_start(sid) + COMMIT_SIZE) <= mask.bytes(sid)
 {
+    mask.i_bytes_ensures(sid);
     reveal(CommitMask::bytes);
-    broadcast use CommitMask::bytes_ensures;
 }
 
 

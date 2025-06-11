@@ -15,7 +15,7 @@ use crate::os_mem::*;
 
 verus!{
 
-broadcast use CommitMask::bytes_ensures;
+broadcast use CommitMask::i_bytes_ensures;
 
 fn clock_now() -> i64 {
     let t = clock_gettime_monotonic();
@@ -35,10 +35,10 @@ fn segment_commit_mask(
         segment_ptr as int + SEGMENT_SIZE <= usize::MAX,
         p >= segment_ptr as int,
         p + size <= segment_ptr as int + SEGMENT_SIZE,
-        old(cm)@ == Set::<int>::empty(),
+        old(cm)@ == ISet::<int>::empty(),
     ensures ({ let (start_p, full_size) = res; {
-        (cm@ == Set::<int>::empty() ==> !conservative ==> size == 0)
-        && (cm@ != Set::<int>::empty() ==>
+        (cm@ == ISet::<int>::empty() ==> !conservative ==> size == 0)
+        && (cm@ != ISet::<int>::empty() ==>
             (conservative ==> p <= start_p as int <= start_p as int + full_size <= p + size)
             && (!conservative ==> start_p as int <= p <= p + size <= start_p as int + full_size)
             && start_p as int >= segment_ptr as int
@@ -50,7 +50,7 @@ fn segment_commit_mask(
             && start_p as int % COMMIT_SIZE as int == 0
             && full_size as int % COMMIT_SIZE as int == 0
             && cm@ =~= 
-                set_int_range((start_p as int - segment_ptr as int) / COMMIT_SIZE as int,
+                ISet::int_range((start_p as int - segment_ptr as int) / COMMIT_SIZE as int,
                     (((start_p as int + full_size - segment_ptr as int) / COMMIT_SIZE as int)))
             && start_p@.provenance == segment_ptr@.provenance
         )

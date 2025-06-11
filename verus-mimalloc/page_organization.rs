@@ -62,7 +62,7 @@ pub open spec fn pages_with_segment(segment_id: SegmentId, lo: int, hi: int, dat
         data_fn)
 }
 
-broadcast proof fn pages_with_segment_ensures(segment_id: SegmentId, lo: int, hi: int, data_fn: spec_fn(PageId) -> PageData)
+pub broadcast proof fn pages_with_segment_ensures(segment_id: SegmentId, lo: int, hi: int, data_fn: spec_fn(PageId) -> PageData)
 requires 0<=lo<=hi,
 ensures (#[trigger] pages_with_segment(segment_id, lo, hi, data_fn)) .congruent(
     IMap::new(

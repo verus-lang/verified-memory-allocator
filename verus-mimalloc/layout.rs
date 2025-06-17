@@ -20,22 +20,20 @@ pub open spec fn is_page_ptr(ptr: *mut Page, page_id: PageId) -> bool {
         && 0 <= page_id.idx <= SLICES_PER_SEGMENT
         && segment_start(page_id.segment_id) + SEGMENT_SIZE < usize::MAX
         && ptr@.provenance == page_id.segment_id.provenance
-        && ptr@.metadata == Metadata::Thin
 }
 
 pub open spec fn is_segment_ptr(ptr: *mut SegmentHeader, segment_id: SegmentId) -> bool {
     ptr as int == segment_start(segment_id)
       && ptr as int + SEGMENT_SIZE < usize::MAX
       && ptr@.provenance == segment_id.provenance
-      && ptr@.metadata == Metadata::Thin
 }
 
 pub open spec fn is_heap_ptr(ptr: *mut Heap, heap_id: HeapId) -> bool {
-    heap_id.id == ptr.addr() && ptr@.provenance == heap_id.provenance && ptr@.metadata == Metadata::Thin
+    heap_id.id == ptr.addr() && ptr@.provenance == heap_id.provenance
 }
 
 pub open spec fn is_tld_ptr(ptr: *mut Tld, tld_id: TldId) -> bool {
-    tld_id.id == ptr.addr() && ptr@.provenance == tld_id.provenance && ptr@.metadata == Metadata::Thin
+    tld_id.id == ptr.addr() && ptr@.provenance == tld_id.provenance
 }
 
 pub closed spec fn segment_start(segment_id: SegmentId) -> int {
@@ -71,7 +69,6 @@ pub closed spec fn block_start(block_id: BlockId) -> int {
 
 pub open spec fn is_block_ptr(ptr: *mut u8, block_id: BlockId) -> bool {
     &&& ptr@.provenance == block_id.page_id.segment_id.provenance
-    &&& ptr@.metadata == Metadata::Thin
     &&& is_block_ptr1(ptr as int, block_id)
 }
 
@@ -370,7 +367,6 @@ pub proof fn mk_segment_id(p: *mut SegmentHeader) -> (id: SegmentId)
     requires p as int >= 0,
         p as int % SEGMENT_SIZE as int == 0,
         ((p as int + SEGMENT_SIZE as int) < usize::MAX),
-        p@.metadata == Metadata::Thin,
     ensures is_segment_ptr(p, id),
 {
     const_facts();

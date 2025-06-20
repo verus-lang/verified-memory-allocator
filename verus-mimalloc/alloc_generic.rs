@@ -379,12 +379,13 @@ fn page_free_list_extend(
             //assert(block_start_at(page_id, block_size, block_id.idx as int)
             //  < segment_start(segment_id) + (block_id.slice_idx * SLICE_SIZE) + SLICE_SIZE);
 
-            assert(is_block_ptr1(
-                block_start(block_tokens.index(i).key()),
-                block_tokens.index(i).key(),
-            )) by {
-                assume(false); // TODO(jonh): left off here
-            }
+//             assert(is_block_ptr1(
+//                 block_start(block_tokens.index(i).key()),
+//                 block_tokens.index(i).key(),
+//             )) by {
+//                 assume(false); // TODO(jonh): left off here
+//             }
+               assume(false); // TODO(jonh): left off here
         }
     }
 
@@ -396,7 +397,7 @@ fn page_free_list_extend(
 //         let ghost tokens = block_tokens;
 //         assert forall |i: int| cap <= i < cap + extend ==> old(tokens).index(i).instance_id() == old(sself).instance().id() by {}
 //     }
-    assume(false);
+    assume(false);  // TODO(jonh): stuck
     page_get_mut_inner!(page_ptr, local, page_inner => {
         page_inner.free.prepend_contiguous_blocks(
             start, last, bsize,

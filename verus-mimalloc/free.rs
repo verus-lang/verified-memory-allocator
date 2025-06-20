@@ -390,7 +390,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
             let tracked pair = pair_opt.tracked_unwrap();
             let tracked (mut delay_token, mut ghost_ll) = pair;
 
-            let ghost ok = cas_result.is_Ok();
+            let ghost ok = cas_result.is_ok();
             if use_delayed {
                 if ok {
                     let tracked (Tracked(delay_token0), Tracked(delay_actor_token)) =

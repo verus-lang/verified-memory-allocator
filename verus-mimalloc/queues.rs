@@ -63,7 +63,7 @@ pub fn page_queue_remove(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(local)
     let ghost next_id = local.page_organization.pages[page_id].dlist_entry.unwrap().next;
 
     if prev.addr() != 0 {
-        let prev = PagePtr { page_ptr: prev, page_id: Ghost(prev_id.get_Some_0()) };
+        let prev = PagePtr { page_ptr: prev, page_id: Ghost(prev_id.unwrap()) };
         //assert(prev.wf());
         //assert(prev.is_in(*local));
         used_page_get_mut_next!(prev, local, n => {
@@ -72,7 +72,7 @@ pub fn page_queue_remove(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(local)
     }
 
     if next.addr() != 0 {
-        let next = PagePtr { page_ptr: next, page_id: Ghost(next_id.get_Some_0()) };
+        let next = PagePtr { page_ptr: next, page_id: Ghost(next_id.unwrap()) };
         //assert(next.wf());
         //assert(next.is_in(*local));
         used_page_get_mut_prev!(next, local, p => {
@@ -269,7 +269,7 @@ pub fn page_queue_push(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(local): 
 
     if first_in_queue.addr() != 0 {
         let first_in_queue_ptr = PagePtr { page_ptr: first_in_queue,
-            page_id: Ghost(local.page_organization.used_dlist_headers[pq as int].first.get_Some_0()) };
+            page_id: Ghost(local.page_organization.used_dlist_headers[pq as int].first.unwrap()) };
         //assert(first_in_queue_ptr.wf());
         //assert(first_in_queue_ptr.is_in(*old(local)));
         used_page_get_mut_prev!(first_in_queue_ptr, local, p => {
@@ -463,7 +463,7 @@ pub fn page_queue_push_back(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(loc
 
     if last_in_queue.addr() != 0 {
         let last_in_queue_ptr = PagePtr { page_ptr: last_in_queue,
-            page_id: Ghost(local.page_organization.used_dlist_headers[pq as int].last.get_Some_0()) };
+            page_id: Ghost(local.page_organization.used_dlist_headers[pq as int].last.unwrap()) };
         //assert(last_in_queue_ptr.wf());
         //assert(last_in_queue_ptr.is_in(*old(local)));
         used_page_get_mut_next!(last_in_queue_ptr, local, n => {

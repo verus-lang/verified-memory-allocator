@@ -1579,7 +1579,7 @@ impl ThreadLLSimple {
                 let tracked mut ptr_mem = ptr_mem0;
                 let tracked raw_mem = raw_mem0;
 
-                let ghost ok = cas_result.is_Ok();
+                let ghost ok = cas_result.is_ok();
 
                 if ok {
                     let tracked block_token = block_token_opt.tracked_unwrap();

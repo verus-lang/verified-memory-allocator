@@ -239,9 +239,9 @@ fn segments_page_find_and_allocate(
                 tld_ptr.wf(),
                 tld_ptr.is_in(*local),
                 is_page_ptr_opt(slice_ptr, slice_page_id),
-                slice_page_id.is_Some() ==>
+                slice_page_id.is_some() ==>
                     local.page_organization.valid_unused_page(
-                        slice_page_id.get_Some_0(), sbin_idx as int, list_idx),
+                        slice_page_id.unwrap(), sbin_idx as int, list_idx),
                 slice_count > 0,
                 local.heap_id == old(local).heap_id,
                 slice_count == (if slice_count0 == 0 { 1 } else { slice_count0 }),
@@ -249,7 +249,7 @@ fn segments_page_find_and_allocate(
         {
             let slice = PagePtr {
                 page_ptr: slice_ptr,
-                page_id: Ghost(slice_page_id.get_Some_0())
+                page_id: Ghost(slice_page_id.unwrap())
             };
             assert(slice.wf());
 
@@ -277,7 +277,7 @@ fn segments_page_find_and_allocate(
                         assert(tld_ptr.is_in(*local));
                         assert(slice.wf());
                         assert((local).page_organization.popped == Some(Popped { page_id: slice.page_id@ }));
-                        assert((local).page_organization.pages[slice.page_id@].countget_Some_0()
+                        assert((local).page_organization.pages[slice.page_id@].countunwrap()
                             == current_slice_count);
                         assert(SLICES_PER_SEGMENT >= current_slice_count);
                         assert(current_slice_count > target_slice_count);
@@ -314,10 +314,10 @@ fn segments_page_find_and_allocate(
             slice_ptr = slice.get_next(Tracked(&*local));
             proof {
                 local.page_organization.next_is_in(
-                    slice_page_id.get_Some_0(), sbin_idx as int, list_idx);
+                    slice_page_id.unwrap(), sbin_idx as int, list_idx);
 
-                slice_page_id = local.page_organization.pages[slice_page_id.get_Some_0()]
-                    .dlist_entry.get_Some_0().next;
+                slice_page_id = local.page_organization.pages[slice_page_id.unwrap()]
+                    .dlist_entry.unwrap().next;
                 list_idx = list_idx + 1;
             }
         }
@@ -345,7 +345,7 @@ fn span_queue_delete(
         tld_ptr.is_in(*old(local)),
         slice.wf(),
         old(local).page_organization.valid_unused_page(slice.page_id@, sbin_idx as int, list_idx),
-        count == old(local).page_organization.pages[slice.page_id@].count.get_Some_0(),
+        count == old(local).page_organization.pages[slice.page_id@].count.unwrap(),
         (match old(local).page_organization.popped {
             Popped::No => true,
             Popped::SegmentFreeing(sid, idx) =>
@@ -392,9 +392,9 @@ fn span_queue_delete(
                 });
         });
     } else {
-        //assert(local.page_organization.pages[slice.page_id@].dlist_entry.get_Some_0().prev.is_Some());
+        //assert(local.page_organization.pages[slice.page_id@].dlist_entry.unwrap().prev.is_some());
         let prev_page_ptr = PagePtr { page_ptr: prev,
-            page_id: Ghost(local.page_organization.pages[slice.page_id@].dlist_entry.get_Some_0().prev.get_Some_0()), };
+            page_id: Ghost(local.page_organization.pages[slice.page_id@].dlist_entry.unwrap().prev.unwrap()), };
         //assert(prev_page_ptr.wf());
 
         /*assert(local.page_organization_valid());
@@ -427,7 +427,7 @@ fn span_queue_delete(
         });
     } else {
         let next_page_ptr = PagePtr { page_ptr: next,
-            page_id: Ghost(local.page_organization.pages[slice.page_id@].dlist_entry.get_Some_0().next.get_Some_0()), };
+            page_id: Ghost(local.page_organization.pages[slice.page_id@].dlist_entry.unwrap().next.unwrap()), };
         //assert(next_page_ptr.wf());
 
         //assert(local.psa.dom().contains(next_page_ptr.page_id@));
@@ -441,14 +441,14 @@ fn span_queue_delete(
         let old_state = local.page_organization;
         local.page_organization = next_state;
 
-        /*if old(local).page_organization.pages[slice.page_id@].dlist_entry.get_Some_0().prev.is_Some() &&
-            old(local).page_organization.pages[slice.page_id@].dlist_entry.get_Some_0().next.is_Some()
+        /*if old(local).page_organization.pages[slice.page_id@].dlist_entry.unwrap().prev.is_some() &&
+            old(local).page_organization.pages[slice.page_id@].dlist_entry.unwrap().next.is_some()
         {
-            let old_p = old(local).page_organization.pages[slice.page_id@].dlist_entry.get_Some_0().prev.get_Some_0();
-            let old_n = old(local).page_organization.pages[slice.page_id@].dlist_entry.get_Some_0().next.get_Some_0();
+            let old_p = old(local).page_organization.pages[slice.page_id@].dlist_entry.unwrap().prev.unwrap();
+            let old_n = old(local).page_organization.pages[slice.page_id@].dlist_entry.unwrap().next.unwrap();
 
-            let p = local.page_organization.pages[slice.page_id@].dlist_entry.get_Some_0().prev.get_Some_0();
-            let n = local.page_organization.pages[slice.page_id@].dlist_entry.get_Some_0().next.get_Some_0();
+            let p = local.page_organization.pages[slice.page_id@].dlist_entry.unwrap().prev.unwrap();
+            let n = local.page_organization.pages[slice.page_id@].dlist_entry.unwrap().next.unwrap();
 
             //assert(old_p == p);
             //assert(old_n == n);
@@ -492,7 +492,7 @@ fn span_queue_delete(
         }*/
 
         //let org_queues = local.page_organization.unused_dlist_headers;
-        //let queues = local.tld@.value.get_Some_0().segments.span_queue_headers;
+        //let queues = local.tld@.value.unwrap().segments.span_queue_headers;
         /*assert(is_page_ptr_opt(queues@[sbin_idx as int].first, org_queues[sbin_idx as int].first));
         assert(is_page_ptr_opt(queues@[sbin_idx as int].last, org_queues[sbin_idx as int].last));
         assert(page_organization_queues_match(org_queues, queues@));
@@ -569,7 +569,7 @@ fn segment_slice_split(
 
     if first_in_queue.addr() != 0 {
         let first_in_queue_ptr = PagePtr { page_ptr: first_in_queue,
-            page_id: Ghost(local.page_organization.unused_dlist_headers[bin_idx as int].first.get_Some_0()) };
+            page_id: Ghost(local.page_organization.unused_dlist_headers[bin_idx as int].first.unwrap()) };
         unused_page_get_mut_prev!(first_in_queue_ptr, local, p => {
             p = next_slice.page_ptr;
         });
@@ -633,7 +633,7 @@ fn segment_slice_split(
         //let psa = local.psa;
 
         //let old_org_queues = old(local).page_organization.unused_dlist_headers;
-        //let old_queues = old(local).tld@.value.get_Some_0().segments.span_queue_headers;
+        //let old_queues = old(local).tld@.value.unwrap().segments.span_queue_headers;
 
         //assert(page_organization_pages_match_data(org_pages[slice.page_id@], pages[slice.page_id@], psa[slice.page_id@], slice.page_id@, local.page_organization.popped));
 
@@ -648,7 +648,7 @@ fn segment_slice_split(
         }*/
 
         /*if first_in_queue.id() != 0 {
-            let first_page_id = local.page_organization.unused_dlist_headers[bin_idx as int].first.get_Some_0();
+            let first_page_id = local.page_organization.unused_dlist_headers[bin_idx as int].first.unwrap();
             assert(page_organization_pages_match_data(org_pages[first_page_id], pages[first_page_id], psa[first_page_id]));
         }*/
 
@@ -658,7 +658,7 @@ fn segment_slice_split(
         /*assert forall |pid| #[trigger] org_pages.dom().contains(pid) implies
             page_organization_pages_match_data(org_pages[pid], pages[pid], psa[pid], pid, local.page_organization.popped)
         by {
-            let first_id = old(local).page_organization.unused_dlist_headers[bin_idx as int].first.get_Some_0();
+            let first_id = old(local).page_organization.unused_dlist_headers[bin_idx as int].first.unwrap();
             if pid == page_id { 
                 assert(page_organization_pages_match_data(org_pages[pid], pages[pid], psa[pid], pid, local.page_organization.popped));
             } else if pid == next_id {
@@ -1698,7 +1698,7 @@ fn segment_span_free(
     });
     if first_in_queue.addr() != 0 {
         let first_in_queue_ptr = PagePtr { page_ptr: first_in_queue,
-            page_id: Ghost(local.page_organization.unused_dlist_headers[bin_idx as int].first.get_Some_0()) };
+            page_id: Ghost(local.page_organization.unused_dlist_headers[bin_idx as int].first.unwrap()) };
         unused_page_get_mut_prev!(first_in_queue_ptr, local, p => {
             p = slice.page_ptr;
         });
@@ -1726,7 +1726,7 @@ fn segment_span_free(
         let pages = local.pages;
         let psa = local.psa;
         let isfq = local.page_organization.unused_dlist_headers[bin_idx as int].first.is_some();
-        let fqid = local.page_organization.unused_dlist_headers[bin_idx as int].first.get_Some_0();
+        let fqid = local.page_organization.unused_dlist_headers[bin_idx as int].first.unwrap();
         let segment_id = slice.page_id@.segment_id;
         assert(slice_index + slice_count >= 1);
         let last_page = PageId { segment_id, idx: (slice_index + slice_count - 1) as nat };
@@ -1956,16 +1956,16 @@ fn segment_page_clear(page: PagePtr, tld: TldPtr, Tracked(local): Tracked<&mut L
                     assert(org_pages[pid].offset.is_some());
                     let o = org_pages[pid].offset.unwrap();
 
-                    assert(old_psa[pid].points_to@.value.get_Some_0().offset as int == o * SIZEOF_PAGE_HEADER);
+                    assert(old_psa[pid].points_to@.value.unwrap().offset as int == o * SIZEOF_PAGE_HEADER);
 
 
                     assert(old(local).thread_token.value().pages[pid].shared_access
-                        .points_to@.value.get_Some_0().offset as int == o * SIZEOF_PAGE_HEADER);
+                        .points_to@.value.unwrap().offset as int == o * SIZEOF_PAGE_HEADER);
 
-                    assert(psa_map[pid].points_to@.value.get_Some_0().offset as int == o * SIZEOF_PAGE_HEADER);
-                    assert(local.unused_pages[pid].points_to@.value.get_Some_0().offset as int == o * SIZEOF_PAGE_HEADER);
+                    assert(psa_map[pid].points_to@.value.unwrap().offset as int == o * SIZEOF_PAGE_HEADER);
+                    assert(local.unused_pages[pid].points_to@.value.unwrap().offset as int == o * SIZEOF_PAGE_HEADER);
 
-                    assert(psa[pid].points_to@.value.get_Some_0().offset as int == o * SIZEOF_PAGE_HEADER);
+                    assert(psa[pid].points_to@.value.unwrap().offset as int == o * SIZEOF_PAGE_HEADER);
 
                     assert(page_organization_pages_match_data(org_pages[pid], pages[pid], psa[pid]));
                 } else if pid.idx == page_id.idx + n_slices - 1 {
@@ -2124,7 +2124,7 @@ fn segment_span_free_coalesce(slice: PagePtr, tld: TldPtr, Tracked(local): Track
 
             preserves_mem_chunk_good(local_snap, *local);
             //assert(page_organization_queues_match(local.page_organization.unused_dlist_headers,
-            //      local.tld@.value.get_Some_0().segments.span_queue_headers@));
+            //      local.tld@.value.unwrap().segments.span_queue_headers@));
             //assert(local.page_organization_valid());
             //assert(local.wf_main());
         }
@@ -2249,7 +2249,7 @@ fn segment_span_free_coalesce_before(segment: SegmentPtr, slice: PagePtr, tld: T
                 local.page_organization = next_state;
                 preserves_mem_chunk_good(local_snap, *local);
                 //assert(page_organization_queues_match(local.page_organization.unused_dlist_headers,
-                //      local.tld@.value.get_Some_0().segments.span_queue_headers));
+                //      local.tld@.value.unwrap().segments.span_queue_headers));
                 //assert(local.page_organization_valid());
                 //let slice_page_id = slice.page_id@;
                 //assert(

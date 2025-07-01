@@ -73,7 +73,7 @@ fn find_free_page(heap_ptr: HeapPtr, size: usize, Tracked(local): Tracked<&mut L
         crate::bin_sizes::bin_size_result(size); 
     }
 
-    let mut page = PagePtr { page_ptr: heap_ptr.get_pages(Tracked(&*local))[pq].first, page_id: Ghost(local.page_organization.used_dlist_headers[pq as int].first.get_Some_0()) };
+    let mut page = PagePtr { page_ptr: heap_ptr.get_pages(Tracked(&*local))[pq].first, page_id: Ghost(local.page_organization.used_dlist_headers[pq as int].first.unwrap()) };
 
     if page.page_ptr.addr() != 0 {
         crate::alloc_generic::page_free_collect(page, false, Tracked(&mut *local));
@@ -101,7 +101,7 @@ fn page_queue_find_free_ex(heap_ptr: HeapPtr, pq: usize, first_try: bool, Tracke
         page.page_ptr.addr() != 0 ==> 
             local.pages.index(page.page_id@).inner.value().xblock_size == size_of_bin(pq as int)
 {
-    let mut page = PagePtr { page_ptr: heap_ptr.get_pages(Tracked(&*local))[pq].first, page_id: Ghost(local.page_organization.used_dlist_headers[pq as int].first.get_Some_0()) };
+    let mut page = PagePtr { page_ptr: heap_ptr.get_pages(Tracked(&*local))[pq].first, page_id: Ghost(local.page_organization.used_dlist_headers[pq as int].first.unwrap()) };
     let ghost mut list_idx = 0;
     proof {
         local.page_organization.used_first_is_in(pq as int);

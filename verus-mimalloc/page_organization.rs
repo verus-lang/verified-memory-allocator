@@ -511,7 +511,7 @@ state_machine!{ PageOrg {
               Some(count) => 0 <= count <= SLICES_PER_SEGMENT,
               None => false,
           })
-          && self.pages[page_id].dlist_entry.is_Some()
+          && self.pages[page_id].dlist_entry.is_some()
           && 0 <= sbin_idx <= SEGMENT_BIN_MAX
           && 0 <= list_idx < self.unused_lists[sbin_idx].len()
           && self.unused_lists[sbin_idx][list_idx] == page_id
@@ -539,12 +539,12 @@ state_machine!{ PageOrg {
         requires self.invariant(), self.popped.is_No(),
             self.valid_unused_page(page_id, sbin_idx, list_idx)
         ensures
-            match self.pages[page_id].dlist_entry.get_Some_0().next {
+            match self.pages[page_id].dlist_entry.unwrap().next {
                 Some(page_id) => self.valid_unused_page(page_id, sbin_idx, list_idx + 1),
                 None => true,
             }
     {
-        match self.pages[page_id].dlist_entry.get_Some_0().next {
+        match self.pages[page_id].dlist_entry.unwrap().next {
             Some(next_id) => {
                 self.unused_ll_stuff(sbin_idx, list_idx);
                 assert(valid_ll_i(self.pages, self.unused_lists[sbin_idx], list_idx));
@@ -819,7 +819,7 @@ state_machine!{ PageOrg {
           //    Some(count) => 0 <= count <= SLICES_PER_SEGMENT,
           //    None => false,
           //})
-          && self.pages[page_id].dlist_entry.is_Some()
+          && self.pages[page_id].dlist_entry.is_some()
           && self.pages[page_id].offset == Some(0nat)
           && (crate::bin_sizes::valid_bin_idx(bin_idx) || bin_idx == BIN_FULL)
           && 0 <= list_idx < self.used_lists[bin_idx].len()
@@ -856,12 +856,12 @@ state_machine!{ PageOrg {
         requires self.invariant(),
             self.valid_used_page(page_id, bin_idx, list_idx)
         ensures
-            match self.pages[page_id].dlist_entry.get_Some_0().next {
+            match self.pages[page_id].dlist_entry.unwrap().next {
                 Some(page_id) => self.valid_used_page(page_id, bin_idx, list_idx + 1),
                 None => true,
             }
     {
-        match self.pages[page_id].dlist_entry.get_Some_0().next {
+        match self.pages[page_id].dlist_entry.unwrap().next {
             Some(next_id) => {
                 self.used_ll_stuff(bin_idx, list_idx);
                 assert(valid_ll_i(self.pages, self.used_lists[bin_idx], list_idx));
@@ -3795,7 +3795,7 @@ state_machine!{ PageOrg {
         assert(valid_ll_i(pre.pages, pre.used_lists[bin_idx], list_idx));
         pre.ll_used_distinct(bin_idx, list_idx, bin_idx, list_idx + 1);
         assert(next_page_id != page_id);
-        assert(post.pages[next_page_id].dlist_entry.is_Some());
+        assert(post.pages[next_page_id].dlist_entry.is_some());
     }
 
     #[inductive(forget_about_first_page2)]

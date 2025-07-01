@@ -312,7 +312,6 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
             perm.is_range(ptr as int, dealloc.block_id().block_size as int),
             perm.provenance() == ptr@.provenance,
             ptr as *mut u8 == dealloc.ptr,
-            ptr@.metadata == Metadata::Thin,
             is_page_ptr(page.page_ptr, dealloc.block_id().page_id),
             local.wf(),
             common_preserves(*old(local), *local),
@@ -391,7 +390,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
             let tracked pair = pair_opt.tracked_unwrap();
             let tracked (mut delay_token, mut ghost_ll) = pair;
 
-            let ghost ok = cas_result.is_Ok();
+            let ghost ok = cas_result.is_ok();
             if use_delayed {
                 if ok {
                     let tracked (Tracked(delay_token0), Tracked(delay_actor_token)) =
@@ -437,8 +436,6 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
             //assert(delay_token@.instance == pag.xthread_free.instance@);
             //assert(delay_token@.key == pag.xthread_free.page_id());
             //assert(v_new as int == ghost_ll.ptr() as int + delay_token@.value.to_int());
-            //assert(v_new@.metadata == Metadata::Thin);
-            //assert(v_new@.metadata == ghost_ll.ptr()@.metadata);
             //assert(ghost_ll.ptr() as int % 4 == 0);
         });
 

@@ -100,7 +100,6 @@ impl LL {
                   // Each node points to the next node
                   perm.is_init()
                   && perm.value().ptr.addr() == next_ptr.addr()
-                  && perm.value().ptr@.metadata == Metadata::Thin
 
                   // The PointsToRaw makes up the rest of the block size allocation
                   && block_token.key().block_size - size_of::<Node>() >= 0
@@ -112,7 +111,6 @@ impl LL {
                   // block_token is correct
                   && block_token.instance_id() == self.data@.instance.id()
                   && is_block_ptr(perm.ptr() as *mut u8, block_token.key())
-                  && perm.ptr()@.metadata == Metadata::Thin
 
                   && (self.data@.fixed_page ==> (
                       block_token.key().page_id == self.data@.page_id
@@ -131,7 +129,6 @@ impl LL {
     pub closed spec fn wf(&self) -> bool {
         &&& (forall |i: nat| self.perms@.dom().contains(i) ==> 0 <= i < self.data@.len)
         &&& self.first.addr() == self.next_ptr(self.data@.len).addr()
-        &&& self.first@.metadata == Metadata::Thin
         &&& (forall |i: nat| self.valid_node(i, #[trigger] self.next_ptr(i)))
     }
 
@@ -267,7 +264,6 @@ impl LL {
             points_to_ptr.ptr() == ptr,
             points_to_ptr.is_init(),
             points_to_ptr.value().ptr.addr() == old(self).ptr().addr(),
-            points_to_ptr.value().ptr@.metadata == Metadata::Thin,
 
             // Require the padding to be correct
             points_to_raw.is_range(
@@ -276,7 +272,6 @@ impl LL {
             points_to_raw.provenance() == is_exposed.provenance(),
             points_to_raw.provenance() == ptr@.provenance,
             block_token.key().block_size - size_of::<Node>() >= 0,
-            ptr@.metadata == Metadata::Thin,
 
             old(self).fixed_page() ==> (
                 block_token.key().page_id == old(self).page_id()
@@ -400,8 +395,6 @@ impl LL {
 
         let ptr: *mut Node = with_exposed_provenance(self.first.addr(), Tracked(is_exposed));
         //assert(ptr.addr() == points_to_node.ptr().addr());
-        //assert(points_to_node.ptr()@.metadata == Metadata::Thin);
-        //assert(ptr@.metadata == points_to_node.ptr()@.metadata);
         //assert(ptr@.provenance == points_to_node.ptr()@.provenance);
         let node = ptr_mut_read(ptr, Tracked(&mut points_to_node));
         self.first = node.ptr;
@@ -448,7 +441,6 @@ impl LL {
             perm.contains_range(ptr as int, size_of::<Node>() as int),
             perm.provenance() == ptr@.provenance,
             ptr as int % align_of::<crate::linked_list::Node>() as int == 0,
-            ptr@.metadata == Metadata::Thin,
         ensures ({
             let points_to = res.0@;
             let points_to_raw = res.1@;
@@ -580,7 +572,6 @@ impl LL {
                 other.len() < u32::MAX,
                 other.wf(),
                 p.addr() == other.perms@[(other.len() - count) as nat].0.ptr().addr(),
-                p@.metadata == Metadata::Thin,
             ensures
                 count == other.len(),
                 p == other.perms@[0].0.ptr(),
@@ -727,7 +718,6 @@ impl LL {
 
             old(points_to_raw_r).is_range(start as int, extend as int * bsize as int),
             old(points_to_raw_r).provenance() == start@.provenance,
-            start@.metadata == Metadata::Thin,
             start@.provenance == old(self).page_id().segment_id.provenance,
             start as int + extend * bsize <= usize::MAX,
 
@@ -780,7 +770,6 @@ impl LL {
               last as int == start.addr() + (extend - 1) * bsize,
               points_to_raw.is_range(block as int, (extend - i) * bsize),
               points_to_raw.provenance() == start@.provenance,
-              start@.metadata == Metadata::Thin,
               start@.provenance == self.data@.page_id.segment_id.provenance,
               start@.provenance == exposed.provenance(),
               INTPTR_SIZE as int <= bsize,
@@ -804,11 +793,9 @@ impl LL {
                       &&& new_map[j].2 == tokens_snap[cap + k]
                       &&& new_map[j].0.ptr() as int == start as int + k * bsize
                       &&& new_map[j].0.ptr()@.provenance == start@.provenance
-                      &&& new_map[j].0.ptr()@.metadata == Metadata::Thin
                       &&& new_map[j].0.is_init()
                       &&& new_map[j].0.value().ptr as int == start.addr() + (k+1) * bsize
                       &&& new_map[j].0.value().ptr@.provenance == start@.provenance
-                      &&& new_map[j].0.value().ptr@.metadata == Metadata::Thin
                       &&& new_map[j].1.is_range(
                          start.addr() + k * bsize + size_of::<Node>(),
                          bsize - size_of::<Node>())
@@ -981,7 +968,6 @@ impl LL {
                         //let ptr = perm.ptr() as *mut u8;
                         //let block_id = block_token.key();
                         //assert(ptr@.provenance == block_id.page_id.segment_id.provenance);
-                        //assert(ptr@.metadata == Metadata::Thin);
                         //assert(is_block_ptr1(ptr as int, block_id));
                     }
 
@@ -1589,7 +1575,6 @@ impl ThreadLLSimple {
         requires self.wf(),
             points_to_raw.is_range(ptr as int, block_token.key().block_size as int),
             points_to_raw.provenance() == ptr@.provenance,
-            ptr@.metadata == Metadata::Thin,
             block_token.instance_id() == self.instance@.id(),
             block_token.value().heap_id == Some(self.heap_id@),
             is_block_ptr(ptr as *mut u8, block_token.key()),
@@ -1606,7 +1591,6 @@ impl ThreadLLSimple {
                 self.wf(),
                 points_to_raw.is_range(ptr as int, block_token.key().block_size as int),
                 points_to_raw.provenance() == ptr@.provenance,
-                ptr@.metadata == Metadata::Thin,
                 exposed.provenance() == ptr@.provenance,
 
                 block_token.instance_id() == self.instance@.id(),
@@ -1631,7 +1615,7 @@ impl ThreadLLSimple {
                 let tracked mut ptr_mem = ptr_mem0;
                 let tracked raw_mem = raw_mem0;
 
-                let ghost ok = cas_result.is_Ok();
+                let ghost ok = cas_result.is_ok();
 
                 if ok {
                     let tracked block_token = block_token_opt.tracked_unwrap();
@@ -1790,8 +1774,6 @@ struct_with_invariants!{
                     // The usize value stores the pointer and the delay state
 
                     && v as int == ll.ptr() as int + delay_token.value().to_int()
-                    && v@.metadata == ll.ptr()@.metadata
-                    && v@.metadata == Metadata::Thin
 
                     // Verus should be smart enough to figure out the
                     // encoding is injective from this:
@@ -2104,9 +2086,6 @@ impl ThreadLLWithDelayBits {
             ghost g => {
                 assert(old_v@.addr & 3 == new_v@.addr);
                 assert(old_v@.provenance == new_v@.provenance);
-                assert(old_v@.metadata == new_v@.metadata);
-                assert(old_v@.metadata == Metadata::Thin);
-                assert(new_v@.metadata == Metadata::Thin);
 
                 self.emp_inst.borrow().agree(self.emp.borrow(), &g.0);
                 let tracked (emp_token, pair_opt) = g;
@@ -2130,10 +2109,7 @@ impl ThreadLLWithDelayBits {
                     requires x % 4 == 0usize, 0usize <= y < 4usize;
 
                 //assert(new_v@.provenance == ll.ptr()@.provenance);
-                //assert(new_v@.metadata == ll.ptr()@.metadata);
-                //assert(new_ll.ptr()@.metadata == Metadata::Thin);
                 //assert((new_ll.ptr() as int != 0 ==> new_v@.provenance == new_ll.ptr()@.provenance));
-                //assert(new_v@.metadata == new_ll.ptr()@.metadata);
                 //assert(new_v as int == new_ll.ptr() as int + delay@.value.to_int());
             }
         );
@@ -2179,8 +2155,8 @@ pub fn masked_ptr_delay_get_ptr(v: *mut Node,
     Ghost(expected_delay): Ghost<DelayState>,
     Ghost(expected_ptr): Ghost<*mut Node>) -> (ptr: *mut Node)
   requires v as int == expected_ptr as int + expected_delay.to_int(),
-      expected_ptr as int % 4 == 0, v@.metadata == Metadata::Thin,
-  ensures ptr.addr() == expected_ptr.addr(), ptr@.metadata == Metadata::Thin,
+      expected_ptr as int % 4 == 0
+  ensures ptr.addr() == expected_ptr.addr(),
 {
     proof {
         let v = v.addr();
@@ -2195,8 +2171,8 @@ pub fn masked_ptr_delay_set_ptr(v: *mut Node, new_ptr: *mut Node,
     Ghost(expected_ptr): Ghost<*mut Node>) -> (v2: *mut Node)
   requires v as int == expected_ptr as int + expected_delay.to_int(),
       expected_ptr as int % 4 == 0,
-      new_ptr as int % 4 == 0, v@.metadata == Metadata::Thin, new_ptr@.metadata == Metadata::Thin,
-  ensures v2 as int == new_ptr as int + expected_delay.to_int(), v2@.provenance == new_ptr@.provenance, v2@.metadata == Metadata::Thin,
+      new_ptr as int % 4 == 0,
+  ensures v2 as int == new_ptr as int + expected_delay.to_int(), v2@.provenance == new_ptr@.provenance,
 {
     proof {
         let v = v as usize;
@@ -2212,8 +2188,8 @@ pub fn masked_ptr_delay_set_freeing(v: *mut Node,
     Ghost(expected_delay): Ghost<DelayState>,
     Ghost(expected_ptr): Ghost<*mut Node>) -> (v2: *mut Node)
   requires v as int == expected_ptr as int + expected_delay.to_int(),
-      expected_ptr as int % 4 == 0, v@.metadata == Metadata::Thin,
-  ensures v2 as int == expected_ptr as int + DelayState::Freeing.to_int(), v2@.provenance == v@.provenance, v2@.metadata == Metadata::Thin,
+      expected_ptr as int % 4 == 0,
+  ensures v2 as int == expected_ptr as int + DelayState::Freeing.to_int(), v2@.provenance == v@.provenance,
 {
     proof {
         let v = v as usize;
@@ -2230,7 +2206,6 @@ pub fn masked_ptr_delay_set_delay(v: *mut Node, new_delay: usize,
       expected_ptr as int % 4 == 0, new_delay <= 3,
   ensures v2 as int == expected_ptr as int + new_delay,
       v2@.provenance == v@.provenance,
-      v2@.metadata == v@.metadata,
 {
     proof {
         let v = v.addr();

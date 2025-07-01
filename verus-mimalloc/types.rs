@@ -362,7 +362,6 @@ impl PageFullAccess {
         &&& self.s.points_to.is_init()
         &&& self.s.points_to.value().inner.id() == self.l.inner.id()
         &&& self.s.exposed.provenance() == self.s.points_to.ptr()@.provenance
-        &&& self.s.points_to.ptr()@.metadata == Metadata::Thin
         &&& self.l.inner.is_init()
         &&& self.l.inner.value().zeroed()
     }

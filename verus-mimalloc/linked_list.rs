@@ -1,6 +1,6 @@
 #![allow(unused_imports)]
 
-use state_machines_macros::*;
+use verus_state_machines_macros::*;
 use vstd::prelude::*;
 use vstd::raw_ptr::*;
 use vstd::modes::*;
@@ -900,7 +900,7 @@ impl LL {
             self.data@.len = self.data@.len + extend;
             self.perms.borrow_mut().tracked_union_prefer_right(new_map);
 
-            assert_maps_equal!(*tokens == tokens_snap.remove_keys(
+            assert(*tokens == tokens_snap.remove_keys(
                 set_int_range(cap as int, cap as int + extend)));
             assert forall |j: nat| self.valid_node(j, #[trigger] self.next_ptr(j))
             by {

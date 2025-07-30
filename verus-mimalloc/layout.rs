@@ -1,7 +1,7 @@
 #![feature(allocator_api)]
 #![allow(unused_imports)]
 
-use state_machines_macros::*;
+use verus_state_machines_macros::*;
 use vstd::prelude::*;
 use vstd::raw_ptr::*;
 use vstd::*;

@@ -7,7 +7,7 @@ use vstd::*;
 use vstd::cell::*;
 use vstd::atomic_ghost::*;
 use vstd::shared::Shared;
-use state_machines_macros::*;
+use verus_state_machines_macros::*;
 
 use crate::config::*;
 use crate::tokens::{Mim, PageId, ThreadId, SegmentId, HeapId, PageState, HeapState, SegmentState, TldId};
@@ -1835,7 +1835,7 @@ impl PagePtr {
 #[macro_export]
 macro_rules! tld_get_mut {
     [$($tail:tt)*] => {
-        ::builtin_macros::verus_exec_macro_exprs!(
+        ::vstd::prelude::verus_exec_macro_exprs!(
             $crate::types::tld_get_mut_internal!($($tail)*))
     };
 }
@@ -1843,7 +1843,7 @@ macro_rules! tld_get_mut {
 #[macro_export]
 macro_rules! tld_get_mut_internal {
     ($ptr:expr, $local:ident, $tld:ident => $body:expr) => {
-        ::builtin_macros::verus_exec_expr!{ {
+        ::vstd::prelude::verus_exec_expr!{ {
             let tld_ptr = ($ptr);
 
             let mut $tld = vstd::raw_ptr::ptr_mut_read(tld_ptr.tld_ptr, Tracked(&mut $local.tld));
@@ -1861,7 +1861,7 @@ pub use tld_get_mut_internal;
 #[macro_export]
 macro_rules! page_get_mut_inner {
     [$($tail:tt)*] => {
-        ::builtin_macros::verus_exec_macro_exprs!(
+        ::vstd::prelude::verus_exec_macro_exprs!(
             $crate::types::page_get_mut_inner_internal!($($tail)*))
     };
 }
@@ -1869,7 +1869,7 @@ macro_rules! page_get_mut_inner {
 #[macro_export]
 macro_rules! page_get_mut_inner_internal {
     ($ptr:expr, $local:ident, $page_inner:ident => $body:expr) => {
-        ::builtin_macros::verus_exec_expr!{ {
+        ::vstd::prelude::verus_exec_expr!{ {
             let page_ptr = $ptr;
 
             let tracked perm = &$local.instance.thread_local_state_guards_page(
@@ -1898,7 +1898,7 @@ pub use page_get_mut_inner_internal;
 #[macro_export]
 macro_rules! unused_page_get_mut_prev {
     [$($tail:tt)*] => {
-        ::builtin_macros::verus_exec_macro_exprs!(
+        ::vstd::prelude::verus_exec_macro_exprs!(
             $crate::types::unused_page_get_mut_prev_internal!($($tail)*))
     };
 }
@@ -1906,7 +1906,7 @@ macro_rules! unused_page_get_mut_prev {
 #[macro_export]
 macro_rules! unused_page_get_mut_prev_internal {
     ($ptr:expr, $local:ident, $page_prev:ident => $body:expr) => {
-        ::builtin_macros::verus_exec_expr!{ {
+        ::vstd::prelude::verus_exec_expr!{ {
             let page_ptr = ($ptr);
             assert(page_ptr.wf());
 
@@ -1935,7 +1935,7 @@ pub use unused_page_get_mut_prev_internal;
 #[macro_export]
 macro_rules! unused_page_get_mut_inner {
     [$($tail:tt)*] => {
-        ::builtin_macros::verus_exec_macro_exprs!(
+        ::vstd::prelude::verus_exec_macro_exprs!(
             $crate::types::unused_page_get_mut_inner_internal!($($tail)*))
     };
 }
@@ -1943,7 +1943,7 @@ macro_rules! unused_page_get_mut_inner {
 #[macro_export]
 macro_rules! unused_page_get_mut_inner_internal {
     ($ptr:expr, $local:ident, $page_inner:ident => $body:expr) => {
-        ::builtin_macros::verus_exec_expr!{ {
+        ::vstd::prelude::verus_exec_expr!{ {
             let page_ptr = ($ptr);
 
             let tracked perm = &$local.unused_pages.tracked_borrow(page_ptr.page_id@).points_to;
@@ -1972,7 +1972,7 @@ pub use unused_page_get_mut_inner_internal;
 #[macro_export]
 macro_rules! unused_page_get_mut_next {
     [$($tail:tt)*] => {
-        ::builtin_macros::verus_exec_macro_exprs!(
+        ::vstd::prelude::verus_exec_macro_exprs!(
             $crate::types::unused_page_get_mut_next_internal!($($tail)*))
     };
 }
@@ -1980,7 +1980,7 @@ macro_rules! unused_page_get_mut_next {
 #[macro_export]
 macro_rules! unused_page_get_mut_next_internal {
     ($ptr:expr, $local:ident, $page_next:ident => $body:expr) => {
-        ::builtin_macros::verus_exec_expr!{ {
+        ::vstd::prelude::verus_exec_expr!{ {
             let page_ptr = ($ptr);
 
             let tracked perm = &$local.unused_pages.tracked_borrow(page_ptr.page_id@).points_to;
@@ -2008,7 +2008,7 @@ pub use unused_page_get_mut_next_internal;
 #[macro_export]
 macro_rules! unused_page_get_mut_count {
     [$($tail:tt)*] => {
-        ::builtin_macros::verus_exec_macro_exprs!(
+        ::vstd::prelude::verus_exec_macro_exprs!(
             $crate::types::unused_page_get_mut_count_internal!($($tail)*))
     };
 }
@@ -2016,7 +2016,7 @@ macro_rules! unused_page_get_mut_count {
 #[macro_export]
 macro_rules! unused_page_get_mut_count_internal {
     ($ptr:expr, $local:ident, $page_count:ident => $body:expr) => {
-        ::builtin_macros::verus_exec_expr!{ {
+        ::vstd::prelude::verus_exec_expr!{ {
             let page_ptr = ($ptr);
 
             let tracked perm = &$local.unused_pages.tracked_borrow(page_ptr.page_id@).points_to;
@@ -2045,7 +2045,7 @@ pub use unused_page_get_mut_count_internal;
 #[macro_export]
 macro_rules! unused_page_get_mut {
     [$($tail:tt)*] => {
-        ::builtin_macros::verus_exec_macro_exprs!(
+        ::vstd::prelude::verus_exec_macro_exprs!(
             $crate::types::unused_page_get_mut_internal!($($tail)*))
     };
 }
@@ -2053,7 +2053,7 @@ macro_rules! unused_page_get_mut {
 #[macro_export]
 macro_rules! unused_page_get_mut_internal {
     ($ptr:expr, $local:ident, $page:ident => $body:expr) => {
-        ::builtin_macros::verus_exec_expr!{ {
+        ::vstd::prelude::verus_exec_expr!{ {
             let page_ptr = ($ptr);
 
             let tracked psa = $local.unused_pages.tracked_remove(page_ptr.page_id@);
@@ -2078,7 +2078,7 @@ pub use unused_page_get_mut_internal;
 #[macro_export]
 macro_rules! used_page_get_mut_prev {
     [$($tail:tt)*] => {
-        ::builtin_macros::verus_exec_macro_exprs!(
+        ::vstd::prelude::verus_exec_macro_exprs!(
             $crate::types::used_page_get_mut_prev_internal!($($tail)*))
     };
 }
@@ -2086,7 +2086,7 @@ macro_rules! used_page_get_mut_prev {
 #[macro_export]
 macro_rules! used_page_get_mut_prev_internal {
     ($ptr:expr, $local:ident, $page_prev:ident => $body:expr) => {
-        ::builtin_macros::verus_exec_expr!{ {
+        ::vstd::prelude::verus_exec_expr!{ {
             let page_ptr = ($ptr);
             assert(page_ptr.wf());
 
@@ -2116,7 +2116,7 @@ pub use used_page_get_mut_prev_internal;
 #[macro_export]
 macro_rules! heap_get_pages {
     [$($tail:tt)*] => {
-        ::builtin_macros::verus_exec_macro_exprs!(
+        ::vstd::prelude::verus_exec_macro_exprs!(
             $crate::types::heap_get_pages_internal!($($tail)*))
     };
 }
@@ -2124,7 +2124,7 @@ macro_rules! heap_get_pages {
 #[macro_export]
 macro_rules! heap_get_pages_internal {
     ($ptr:expr, $local:ident, $pages:ident => $body:expr) => {
-        ::builtin_macros::verus_exec_expr!{ {
+        ::vstd::prelude::verus_exec_expr!{ {
             let heap_ptr = ($ptr);
 
             let tracked perm = &$local.instance.thread_local_state_guards_heap(
@@ -2145,7 +2145,7 @@ pub use heap_get_pages_internal;
 #[macro_export]
 macro_rules! heap_get_pages_free_direct {
     [$($tail:tt)*] => {
-        ::builtin_macros::verus_exec_macro_exprs!(
+        ::vstd::prelude::verus_exec_macro_exprs!(
             $crate::types::heap_get_pages_free_direct_internal!($($tail)*))
     };
 }
@@ -2153,7 +2153,7 @@ macro_rules! heap_get_pages_free_direct {
 #[macro_export]
 macro_rules! heap_get_pages_free_direct_internal {
     ($ptr:expr, $local:ident, $pages_free_direct:ident => $body:expr) => {
-        ::builtin_macros::verus_exec_expr!{ {
+        ::vstd::prelude::verus_exec_expr!{ {
             let heap_ptr = ($ptr);
 
             let tracked perm = &$local.instance.thread_local_state_guards_heap(
@@ -2176,7 +2176,7 @@ pub use heap_get_pages_free_direct_internal;
 #[macro_export]
 macro_rules! used_page_get_mut_next {
     [$($tail:tt)*] => {
-        ::builtin_macros::verus_exec_macro_exprs!(
+        ::vstd::prelude::verus_exec_macro_exprs!(
             $crate::types::used_page_get_mut_next_internal!($($tail)*))
     };
 }
@@ -2184,7 +2184,7 @@ macro_rules! used_page_get_mut_next {
 #[macro_export]
 macro_rules! used_page_get_mut_next_internal {
     ($ptr:expr, $local:ident, $page_next:ident => $body:expr) => {
-        ::builtin_macros::verus_exec_expr!{ {
+        ::vstd::prelude::verus_exec_expr!{ {
             let page_ptr = ($ptr);
             assert(page_ptr.wf());
 
@@ -2238,7 +2238,7 @@ pub fn todo()
 #[macro_export]
 macro_rules! segment_get_mut_main {
     [$($tail:tt)*] => {
-        ::builtin_macros::verus_exec_macro_exprs!(
+        ::vstd::prelude::verus_exec_macro_exprs!(
             $crate::types::segment_get_mut_main_internal!($($tail)*))
     };
 }
@@ -2246,7 +2246,7 @@ macro_rules! segment_get_mut_main {
 #[macro_export]
 macro_rules! segment_get_mut_main_internal {
     ($ptr:expr, $local:ident, $segment_main:ident => $body:expr) => {
-        ::builtin_macros::verus_exec_expr!{ {
+        ::vstd::prelude::verus_exec_expr!{ {
             let segment_ptr = $ptr;
 
             let tracked perm = &$local.instance.thread_local_state_guards_segment(
@@ -2275,7 +2275,7 @@ pub use segment_get_mut_main_internal;
 #[macro_export]
 macro_rules! segment_get_mut_main2 {
     [$($tail:tt)*] => {
-        ::builtin_macros::verus_exec_macro_exprs!(
+        ::vstd::prelude::verus_exec_macro_exprs!(
             $crate::types::segment_get_mut_main2_internal!($($tail)*))
     };
 }
@@ -2283,7 +2283,7 @@ macro_rules! segment_get_mut_main2 {
 #[macro_export]
 macro_rules! segment_get_mut_main2_internal {
     ($ptr:expr, $local:ident, $segment_main2:ident => $body:expr) => {
-        ::builtin_macros::verus_exec_expr!{ {
+        ::vstd::prelude::verus_exec_expr!{ {
             let segment_ptr = $ptr;
 
             let tracked perm = &$local.instance.thread_local_state_guards_segment(
@@ -2312,7 +2312,7 @@ pub use segment_get_mut_main2_internal;
 #[macro_export]
 macro_rules! segment_get_mut_local {
     [$($tail:tt)*] => {
-        ::builtin_macros::verus_exec_macro_exprs!(
+        ::vstd::prelude::verus_exec_macro_exprs!(
             $crate::types::segment_get_mut_local_internal!($($tail)*))
     };
 }
@@ -2320,7 +2320,7 @@ macro_rules! segment_get_mut_local {
 #[macro_export]
 macro_rules! segment_get_mut_local_internal {
     ($ptr:expr, $local:ident, $segment_local:ident => $body:expr) => {
-        ::builtin_macros::verus_exec_expr!{ {
+        ::vstd::prelude::verus_exec_expr!{ {
             let segment_ptr = $ptr;
 
             let tracked perm = &$local.instance.thread_local_state_guards_segment(

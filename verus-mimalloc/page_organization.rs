@@ -2,7 +2,7 @@
 
 use vstd::prelude::*;
 use vstd::*;
-use state_machines_macros::*;
+use verus_state_machines_macros::*;
 
 use crate::tokens::{PageId, SegmentId, TldId};
 use crate::config::*;

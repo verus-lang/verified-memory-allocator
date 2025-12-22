@@ -798,7 +798,7 @@ fn segment_span_allocate(
     while i <= extra
         invariant 1 <= i <= extra + 1,
           first_page_id.idx + extra < SLICES_PER_SEGMENT,
-          local == (Local { unused_pages: local.unused_pages, .. local_snapshot }),
+          *local == (Local { unused_pages: local.unused_pages, .. local_snapshot }),
           local.unused_pages.dom() == local_snapshot.unused_pages.dom(),
           slice.wf(),
           slice.page_id == first_page_id,
@@ -1373,7 +1373,7 @@ fn segment_os_alloc(
         local.wf(),
         common_preserves(*old(local), *local),
         local.page_organization == old(local).page_organization,
-        pdecommit_mask == old(pdecommit_mask), // this is only modified if segment cache is used
+        *pdecommit_mask == *old(pdecommit_mask), // this is only modified if segment cache is used
     ({
         let (segment_ptr, new_psegment_slices, new_ppre_size, new_pinfo_slices, is_zero, pcommit, mem_id, mem_large, is_pinned, align_offset, mem_chunk) = res; {
         &&& (segment_ptr.segment_ptr.addr() != 0 ==> {

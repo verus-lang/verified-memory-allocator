@@ -733,7 +733,7 @@ impl LL {
 
             //points_to_raw.ptr() == old(points_to_raw).ptr() + extend * (bsize as int),
             //points_to_raw@.size == old(points_to_raw)@.size - extend * (bsize as int),
-            tokens == old(tokens).remove_keys(
+            *tokens == old(tokens).remove_keys(
                 set_int_range(cap as int, cap as int + extend)),
     {
         // based on mi_page_free_list_extend

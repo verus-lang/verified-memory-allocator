@@ -157,6 +157,7 @@ impl MemChunk {
         tracked_swap(&mut pt, &mut self.points_to);
         let tracked pt = pt.join(points_to);
         self.points_to = pt;
+        assert(self.os == old(self).os);
         assert(self.points_to.dom() =~= old(self).points_to.dom() + points_to.dom());
     }
 }

@@ -606,9 +606,9 @@ fn segment_slice_split(
             c = (current_slice_count - target_slice_count) as u32;
         });
         unused_page_get_mut!(last_slice, local, page => {
-            //assert(0 <= (current_slice_count - target_slice_count) as u32 <= 512);
-            //assert(SIZEOF_PAGE_HEADER == 32);
+            assert(0 <= (current_slice_count - target_slice_count) as u32 <= 512);
             assert(SIZEOF_PAGE_HEADER as u32 == 80);
+            assert(0 <= (current_slice_count - target_slice_count - 1) as u32 * 80 <= u32::MAX);
             //assert((current_slice_count - target_slice_count) as u32 * (SIZEOF_PAGE_HEADER as u32)
             //    == (current_slice_count - target_slice_count) as u32 * 32);
             page.offset = (current_slice_count - target_slice_count - 1) as u32
@@ -833,6 +833,12 @@ fn segment_span_allocate(
 
         let tracked mut this_psa = local.unused_pages.tracked_remove(this_page_id);
         let mut page = ptr_mut_read(this_slice.page_ptr, Tracked(&mut this_psa.points_to));
+        assert(i <= SLICES_PER_SEGMENT);
+        assert(SLICES_PER_SEGMENT == 512);
+        assert(0 <= i as u32 <= 512);
+        assert(SIZEOF_PAGE_HEADER as u32 == 80);
+        assert(i as u32 * 80 <= u32::MAX);
+        assert(i as u32 * SIZEOF_PAGE_HEADER as u32 <= u32::MAX);
         page.offset = i as u32 * SIZEOF_PAGE_HEADER as u32;
         ptr_mut_write(this_slice.page_ptr, Tracked(&mut this_psa.points_to), page);
         proof {
@@ -1659,8 +1665,12 @@ fn segment_span_free(
         let last = segment_ptr.get_page_header_ptr(slice_index + slice_count - 1);
 
         unused_page_get_mut!(last, local, page => {
-            //assert(SIZEOF_PAGE_HEADER as u32 == 80);
-            //assert(slice_count as u32 == slice_count);
+            assert(SIZEOF_PAGE_HEADER as u32 == 80);
+            assert(slice_count as u32 == slice_count);
+            assert(slice_count as u32 - 1 <= 512);
+            assert(slice_count as u32 - 1 >= 0);
+            assert((slice_count as u32 - 1) * SIZEOF_PAGE_HEADER as u32 >= 0);
+            assert((slice_count as u32 - 1) * SIZEOF_PAGE_HEADER as u32 <= u32::MAX);
             page.offset = (slice_count as u32 - 1) * SIZEOF_PAGE_HEADER as u32;
         });
     }

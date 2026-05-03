@@ -1,4 +1,3 @@
-#![feature(allocator_api)]
 #![allow(unused_imports)]
 
 use verus_state_machines_macros::*;

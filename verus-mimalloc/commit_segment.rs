@@ -206,6 +206,12 @@ fn segment_commitx(
                 by {
                     preserves_mem_chunk_good_on_commit(*old(local), *local, sid1);
                 }
+                //assert forall |page_id| local.unused_pages.dom().contains(page_id)
+                //    implies local.page_organization.pages.dom().contains(page_id)
+                //by {
+                assert(local.unused_pages === old(local).unused_pages);
+                assert(local.page_organization === old(local).page_organization);
+                //}
                 assert(local.wf_main());
             }
             return false;
@@ -252,6 +258,8 @@ fn segment_commitx(
             by {
                 preserves_mem_chunk_good_on_commit(*old(local), *local, sid1);
             }
+            assert(local.unused_pages === old(local).unused_pages);
+            assert(local.page_organization === old(local).page_organization);
             assert(local.wf_main());
 
             assert forall |j: int| set_int_range(p as int, p + size).contains(j)
@@ -290,6 +298,8 @@ fn segment_commitx(
 
             preserves_mem_chunk_good_on_decommit(*old(local), *local, sid);
             assert(local.mem_chunk_good(sid));
+            assert(local.unused_pages === old(local).unused_pages);
+            assert(local.page_organization === old(local).page_organization);
 
             assert(local.wf_main());
         }
@@ -421,6 +431,8 @@ pub fn segment_perhaps_decommit(
                 local.segment_pages_used_total(segment_id),
             ));
             assert(local.mem_chunk_good(segment.segment_id@));
+            assert(local.unused_pages === old(local).unused_pages);
+            assert(local.page_organization === old(local).page_organization);
             assert(local.wf_main());
         }
         let ghost local_snap = *local;
@@ -449,6 +461,9 @@ pub fn segment_perhaps_decommit(
             proof { preserves_mem_chunk_good(local_snap, *local); }
         }
     }
+
+    assert(local.unused_pages === old(local).unused_pages);
+    assert(local.page_organization === old(local).page_organization);
 }
 
 pub fn segment_delayed_decommit(

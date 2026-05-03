@@ -408,7 +408,7 @@ fn free_block_mt(page: PagePtr, ptr: *mut u8, Tracked(perm): Tracked<PointsToRaw
                 if ok {
                     let tracked mim_block = mim_block_opt.tracked_unwrap();
                     //assert(ptr_mem.unwrap().ptr() == ptr);
-                    ghost_ll.ghost_insert_block(ptr, ptr_mem.tracked_unwrap(),
+                    LL::ghost_insert_block(mut_ref_tracked(&mut ghost_ll), ptr, ptr_mem.tracked_unwrap(),
                         raw_mem.tracked_unwrap(), mim_block, exposed.tracked_unwrap());
 
                     mim_block_opt = None;

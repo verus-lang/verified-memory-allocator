@@ -248,21 +248,21 @@ impl LL {
     // ghost data in a ghost LL.
 
     pub proof fn ghost_insert_block(
-        tracked &mut self,
+        tracked self_: &mut Tracked<LL>,
         tracked ptr: *mut Node,
         tracked points_to_ptr: PointsTo<Node>,
         tracked points_to_raw: PointsToRaw,
         tracked block_token: Mim::block,
         tracked is_exposed: IsExposed,
      )
-        requires old(self).wf(),
-            block_token.instance_id() == old(self).instance().id(),
+        requires old(self_).wf(),
+            block_token.instance_id() == old(self_).instance().id(),
             is_block_ptr(ptr as *mut u8, block_token.key()),
 
             // Require that the pointer has already been written:
             points_to_ptr.ptr() == ptr,
             points_to_ptr.is_init(),
-            points_to_ptr.value().ptr.addr() == old(self).ptr().addr(),
+            points_to_ptr.value().ptr.addr() == old(self_).ptr().addr(),
 
             // Require the padding to be correct
             points_to_raw.is_range(
@@ -272,56 +272,56 @@ impl LL {
             points_to_raw.provenance() == ptr@.provenance,
             block_token.key().block_size - size_of::<Node>() >= 0,
 
-            old(self).fixed_page() ==> (
-                block_token.key().page_id == old(self).page_id()
-                && block_token.key().block_size == old(self).block_size()
+            old(self_).fixed_page() ==> (
+                block_token.key().page_id == old(self_).page_id()
+                && block_token.key().block_size == old(self_).block_size()
             ),
-            (match old(self).heap_id() {
+            (match old(self_).heap_id() {
                 Some(heap_id) => block_token.value().heap_id == Some(heap_id),
                 None => true,
             }),
         ensures
-            self.wf(),
-            self.block_size() == old(self).block_size(),
-            self.len() == old(self).len() + 1,
-            self.instance() == old(self).instance(),
-            self.page_id() == old(self).page_id(),
-            self.fixed_page() == old(self).fixed_page(),
-            self.heap_id() == old(self).heap_id(),
-            self.ptr() == ptr
+            self_.wf(),
+            self_.block_size() == old(self_).block_size(),
+            self_.len() == old(self_).len() + 1,
+            self_.instance() == old(self_).instance(),
+            self_.page_id() == old(self_).page_id(),
+            self_.fixed_page() == old(self_).fixed_page(),
+            self_.heap_id() == old(self_).heap_id(),
+            self_.ptr() == ptr
     {
-        self.first = ptr;
+        self_.first = ptr;
 
         let tracked tuple = (points_to_ptr, points_to_raw, block_token, is_exposed);
-        self.perms.borrow_mut().tracked_insert(self.data@.len, tuple);
-        self.data@.len = self.data@.len + 1;
+        self_.perms.borrow_mut().tracked_insert(self_.data@.len, tuple);
+        self_.data@.len = self_.data@.len + 1;
 
-        let ghost len = self.data@.len;
+        let ghost len = self_.data@.len;
 
-        assert forall |i: nat| self.perms@.dom().contains(i) implies 0 <= i < self.data@.len
+        assert forall |i: nat| self_.perms@.dom().contains(i) implies 0 <= i < self_.data@.len
         by {
             if i + 1 < len { 
-                assert(old(self).perms@.dom().contains(i));
+                assert(old(self_).perms@.dom().contains(i));
             }
         }
 
-        assert forall |i: nat| #[trigger] self.valid_node(i, self.next_ptr(i))
+        assert forall |i: nat| #[trigger] self_.valid_node(i, self_.next_ptr(i))
         by {
-            assert(old(self).valid_node(i, old(self).next_ptr(i)));
+            assert(old(self_).valid_node(i, old(self_).next_ptr(i)));
             if i > 0 {
                 let j = (i - 1) as nat;
-                assert(old(self).valid_node(j, old(self).next_ptr(j)));
+                assert(old(self_).valid_node(j, old(self_).next_ptr(j)));
             }
             /*if i < len {
                 if i != 0 {
-                    assert(self.perms@.index((i - 1) as nat)
-                      == old(self).perms@.index((i - 1) as nat));
+                    assert(self_.perms@.index((i - 1) as nat)
+                      == old(self_).perms@.index((i - 1) as nat));
                 }
-                assert(old(self).next_ptr(i) == self.next_ptr(i));
+                assert(old(self_).next_ptr(i) == self_.next_ptr(i));
                 if i + 1 == len {
-                    assert(self.valid_node(i, self.next_ptr(i)));
+                    assert(self_.valid_node(i, self_.next_ptr(i)));
                 } else {
-                    assert(self.valid_node(i, self.next_ptr(i)));
+                    assert(self_.valid_node(i, self_.next_ptr(i)));
                 }
             }*/
         }
@@ -1489,14 +1489,14 @@ struct_with_invariants!{
         pub instance: Ghost<Mim::Instance>,
         pub heap_id: Ghost<HeapId>,
 
-        pub atomic: AtomicPtr<Node, _, LL, _>,
+        pub atomic: AtomicPtr<Node, _, Tracked<LL>, _>,
     }
 
     pub closed spec fn wf(&self) -> bool {
         invariant
             on atomic
             with (instance, heap_id)
-            is (v: *mut Node, ll: LL)
+            is (v: *mut Node, ll: Tracked<LL>)
         {
             // Valid linked list
 
@@ -1523,7 +1523,7 @@ impl ThreadLLSimple {
         Self {
             instance: Ghost(instance),
             heap_id: Ghost(heap_id),
-            atomic: AtomicPtr::new(Ghost((Ghost(instance), Ghost(heap_id))), core::ptr::null_mut(), Tracked(LL { first: p, data: Ghost(LLData { fixed_page: false, block_size: arbitrary(), page_id: arbitrary(), instance, len: 0, heap_id: Some(heap_id), }), perms: Tracked(Map::tracked_empty()), }),),
+            atomic: AtomicPtr::new(Ghost((Ghost(instance), Ghost(heap_id))), core::ptr::null_mut(), Tracked(Tracked(LL { first: p, data: Ghost(LLData { fixed_page: false, block_size: arbitrary(), page_id: arbitrary(), instance, len: 0, heap_id: Some(heap_id), }), perms: Tracked(Map::tracked_empty()), })),),
         }
     }
 
@@ -1583,7 +1583,7 @@ impl ThreadLLSimple {
 
                 if ok {
                     let tracked block_token = block_token_opt.tracked_unwrap();
-                    ghost_ll.ghost_insert_block(ptr, ptr_mem, raw_mem, block_token, exposed);
+                    LL::ghost_insert_block(&mut ghost_ll, ptr, ptr_mem, raw_mem, block_token, exposed);
                     block_token_opt = None;
 
                     points_to_raw = PointsToRaw::empty(ptr@.provenance);
@@ -1619,7 +1619,7 @@ impl ThreadLLSimple {
         let res = atomic_with_ghost!(
             &self.atomic => swap(core::ptr::null_mut());
             ghost g => {
-                ll = g;
+                ll = g.get();
                 let mut data = ll.data@;
                 data.len = 0;
                 let tracked new_ll = LL {
@@ -1627,7 +1627,7 @@ impl ThreadLLSimple {
                     data: Ghost(data),
                     perms: Tracked(Map::tracked_empty()),
                 };
-                g = new_ll;
+                g = Tracked(new_ll);
             }
         );
         let new_ll = LL {

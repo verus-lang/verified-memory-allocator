@@ -1,12 +1,12 @@
 #![feature(core_intrinsics)]
-#![feature(lazy_cell)]
+#![feature(allocator_api)]
 #![allow(unused_imports)]
 #![allow(non_snake_case)]
 #![allow(unused_assignments)]
 #![allow(unused_macros)]
 #![feature(thread_id_value)]
-#![feature(strict_provenance)]
 #![verifier::exec_allows_no_decreases_clause]
+#![verifier::deprecated_postcondition_mut_ref_style(true)]
 
 // bottom bread
 

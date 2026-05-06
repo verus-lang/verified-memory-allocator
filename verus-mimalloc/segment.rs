@@ -382,15 +382,7 @@ fn span_queue_delete(
     }
 
     if prev.addr() == 0 {
-        tld_get_mut!(tld_ptr, local, tld => {
-            let cq = tld.segments.span_queue_headers[sbin_idx];
-            tld.segments.span_queue_headers.set(
-                sbin_idx,
-                SpanQueueHeader {
-                    first: next,
-                    .. cq
-                });
-        });
+        tld_ptr.get_mut(Tracked(local)).segments.span_queue_headers[sbin_idx].first = next;
     } else {
         //assert(local.page_organization.pages[slice.page_id@].dlist_entry.unwrap().prev.is_some());
         let prev_page_ptr = PagePtr { page_ptr: prev,
@@ -416,15 +408,7 @@ fn span_queue_delete(
     }
 
     if next.addr() == 0 {
-        tld_get_mut!(tld_ptr, local, tld => {
-            let cq = tld.segments.span_queue_headers[sbin_idx];
-            tld.segments.span_queue_headers.set(
-                sbin_idx,
-                SpanQueueHeader {
-                    last: prev,
-                    .. cq
-                });
-        });
+        tld_ptr.get_mut(Tracked(local)).segments.span_queue_headers[sbin_idx].last = prev;
     } else {
         let next_page_ptr = PagePtr { page_ptr: next,
             page_id: Ghost(local.page_organization.pages[slice.page_id@].dlist_entry.unwrap().next.unwrap()), };
@@ -555,17 +539,12 @@ fn segment_slice_split(
 
     let first_in_queue;
 
-    tld_get_mut!(tld_ptr, local, tld => {
-        let mut cq = tld.segments.span_queue_headers[bin_idx];
-        first_in_queue = cq.first;
-
-        cq.first = next_slice.page_ptr;
-        if first_in_queue.addr() == 0 {
-            cq.last = next_slice.page_ptr;
-        }
-
-        tld.segments.span_queue_headers.set(bin_idx, cq);
-    });
+    let cq = &mut tld_ptr.get_mut(Tracked(local)).segments.span_queue_headers[bin_idx];
+    first_in_queue = cq.first;
+    cq.first = next_slice.page_ptr;
+    if first_in_queue.addr() == 0 {
+        cq.last = next_slice.page_ptr;
+    }
 
     if first_in_queue.addr() != 0 {
         let first_in_queue_ptr = PagePtr { page_ptr: first_in_queue,
@@ -1694,18 +1673,13 @@ fn segment_span_free(
     //assert(local.wf_main());
     let ghost local_snap = *local;
 
-    let first_in_queue;
-    tld_get_mut!(tld_ptr, local, tld => {
-        let mut cq = tld.segments.span_queue_headers[bin_idx];
-        first_in_queue = cq.first;
+    let cq = &mut tld_ptr.get_mut(Tracked(local)).segments.span_queue_headers[bin_idx];
+    let first_in_queue = cq.first;
+    cq.first = slice.page_ptr;
+    if first_in_queue.addr() == 0 {
+        cq.last = slice.page_ptr;
+    }
 
-        cq.first = slice.page_ptr;
-        if first_in_queue.addr() == 0 {
-            cq.last = slice.page_ptr;
-        }
-
-        tld.segments.span_queue_headers.set(bin_idx, cq);
-    });
     if first_in_queue.addr() != 0 {
         let first_in_queue_ptr = PagePtr { page_ptr: first_in_queue,
             page_id: Ghost(local.page_organization.unused_dlist_headers[bin_idx as int].first.unwrap()) };
@@ -2098,18 +2072,13 @@ fn segment_span_free_coalesce(slice: PagePtr, tld: TldPtr, Tracked(local): Track
             });
         }
 
-        tld_get_mut!(tld, local, tld => {
-            let mut cq = tld.segments.span_queue_headers[sbin_idx];
-
-            if prev_ptr.addr() == 0 {
-                cq.first = next_ptr;
-            }
-            if next_ptr.addr() == 0 {
-                cq.last = prev_ptr;
-            }
-
-            tld.segments.span_queue_headers.set(sbin_idx, cq);
-        });
+        let cq = &mut tld.get_mut(Tracked(local)).segments.span_queue_headers[sbin_idx];
+        if prev_ptr.addr() == 0 {
+            cq.first = next_ptr;
+        }
+        if next_ptr.addr() == 0 {
+            cq.last = prev_ptr;
+        }
 
         slice_count += n_count;
 
@@ -2237,18 +2206,13 @@ fn segment_span_free_coalesce_before(segment: SegmentPtr, slice: PagePtr, tld: T
                 });
             }
 
-            tld_get_mut!(tld, local, tld => {
-                let mut cq = tld.segments.span_queue_headers[sbin_idx];
-
-                if prev_ptr.addr() == 0 {
-                    cq.first = next_ptr;
-                }
-                if next_ptr.addr() == 0 {
-                    cq.last = prev_ptr;
-                }
-
-                tld.segments.span_queue_headers.set(sbin_idx, cq);
-            });
+            let cq = &mut tld.get_mut(Tracked(local)).segments.span_queue_headers[sbin_idx];
+            if prev_ptr.addr() == 0 {
+                cq.first = next_ptr;
+            }
+            if next_ptr.addr() == 0 {
+                cq.last = prev_ptr;
+            }
 
             slice_count += n_count;
             slice = page;

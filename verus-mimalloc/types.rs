@@ -1261,6 +1261,21 @@ impl TldPtr {
     }
 
     #[inline(always)]
+    #[verifier::deprecated_postcondition_mut_ref_style(false)]
+    pub fn get_mut<'a>(&self, Tracked(local): Tracked<&'a mut Local>) -> (tld: &'a mut Tld)
+        requires
+            local.tld.ptr() == self.tld_ptr,
+            local.tld.opt_value().is_init(),
+        ensures
+            MemContents::Init(*tld) == old(local).tld.opt_value(),
+            *final(local) == (Local { tld: final(local).tld, .. *old(local) }),
+            final(local).tld.ptr() == old(local).tld.ptr(),
+            final(local).tld.opt_value() == MemContents::Init(*final(tld)),
+    {
+        ptr_mut_ref(self.tld_ptr, Tracked(&mut local.tld))
+    }
+
+    #[inline(always)]
     pub fn get_segments_count(&self, Tracked(local): Tracked<&Local>) -> (count: usize)
         requires
             self.wf(), self.is_in(*local), local.wf_main(),
@@ -1831,32 +1846,6 @@ impl PagePtr {
 }
 
 // Use macro as a work-arounds for not supporting functions that return &mut
-
-#[macro_export]
-macro_rules! tld_get_mut {
-    [$($tail:tt)*] => {
-        ::vstd::prelude::verus_exec_macro_exprs!(
-            $crate::types::tld_get_mut_internal!($($tail)*))
-    };
-}
-
-#[macro_export]
-macro_rules! tld_get_mut_internal {
-    ($ptr:expr, $local:ident, $tld:ident => $body:expr) => {
-        ::vstd::prelude::verus_exec_expr!{ {
-            let tld_ptr = ($ptr);
-
-            let mut $tld = vstd::raw_ptr::ptr_mut_read(tld_ptr.tld_ptr, Tracked(&mut $local.tld));
-
-            { $body }
-
-            vstd::raw_ptr::ptr_mut_write(tld_ptr.tld_ptr, Tracked(&mut $local.tld), $tld);
-        } }
-    }
-}
-
-pub use tld_get_mut;
-pub use tld_get_mut_internal;
 
 #[macro_export]
 macro_rules! page_get_mut_inner {

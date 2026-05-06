@@ -592,8 +592,6 @@ spec fn local_direct_update(loc1: Local, loc2: Local, i: int, j: int, pq: int) -
     &&& loc2 == Local { heap: loc2.heap, .. loc1 }
     &&& loc2.heap == HeapLocalAccess { pages_free_direct: loc2.heap.pages_free_direct, .. loc1.heap }
     &&& loc1.heap.pages_free_direct.id() == loc2.heap.pages_free_direct.id()
-    &&& loc1.heap.pages_free_direct.is_init()
-    &&& loc2.heap.pages_free_direct.is_init()
     &&& pfd_direct_update(
           loc1.heap.pages_free_direct.value()@,
           loc2.heap.pages_free_direct.value()@, i, j,

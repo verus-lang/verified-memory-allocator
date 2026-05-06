@@ -9,7 +9,7 @@ use vstd::modes::*;
 use vstd::set_lib::*;
 use vstd::pervasive::*;
 use vstd::set_lib::*;
-use vstd::cell::*;
+use vstd::cell::pcell::*;
 use vstd::atomic_ghost::*;
 
 use crate::tokens::{Mim, BlockId, DelayState, PageId, PageState, SegmentState, ThreadId};
@@ -1089,14 +1089,10 @@ fn segment_alloc(
                 page_id.segment_id == segment_id && 0 <= page_id.idx < i ==> {
                     &&& psa_map.dom().contains(page_id)
                     &&& pla_map.dom().contains(page_id)
-                    &&& pla_map[page_id].inner.is_init()
-                    &&& pla_map[page_id].count.is_init()
-                    &&& pla_map[page_id].prev.is_init()
-                    &&& pla_map[page_id].next.is_init()
                     &&& pla_map[page_id].inner.value().zeroed()
                     &&& pla_map[page_id].count.value() == 0
-                    &&& pla_map[page_id].prev.value() as int == 0
-                    &&& pla_map[page_id].next.value() as int == 0
+                    &&& pla_map[page_id].prev.value().addr() == 0
+                    &&& pla_map[page_id].next.value().addr() == 0
 
                     &&& is_page_ptr(psa_map[page_id].points_to.ptr(), page_id)
                     &&& psa_map[page_id].points_to.is_init()

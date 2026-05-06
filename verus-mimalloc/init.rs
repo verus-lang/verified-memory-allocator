@@ -7,7 +7,7 @@ use vstd::raw_ptr::*;
 use vstd::*;
 use vstd::modes::*;
 use vstd::set_lib::*;
-use vstd::cell::*;
+use vstd::cell::pcell::*;
 use vstd::shared::Shared;
 
 use crate::tokens::{Mim, BlockId, DelayState, ThreadState, HeapState, HeapId, TldId, ThreadId};
@@ -734,9 +734,9 @@ fn init_empty_page_ptr() -> (e: EmptyPageStuff)
     let tracked mut points_to = points_to_raw.into_typed::<Page>(pt as usize);
     proof { points_to.is_nonnull(); }
 
-    let (count_pcell, Tracked(count_perm)) = PCell::empty();
-    let (prev_pcell, Tracked(prev_perm)) = PCell::empty();
-    let (next_pcell, Tracked(next_perm)) = PCell::empty();
+    let (count_pcell, Tracked(count_perm)) = PCell::new(0);
+    let (prev_pcell, Tracked(prev_perm)) = PCell::new(std::ptr::null_mut());
+    let (next_pcell, Tracked(next_perm)) = PCell::new(std::ptr::null_mut());
     let (inner_pcell, Tracked(inner_perm)) = PCell::new(PageInner {
         flags0: 0,
         flags1: 0,

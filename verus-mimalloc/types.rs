@@ -4,7 +4,8 @@ use vstd::prelude::*;
 use vstd::raw_ptr::*;
 use vstd::modes::*;
 use vstd::*;
-use vstd::cell::*;
+use vstd::cell::pcell::*;
+use vstd::cell::pcell;
 use vstd::atomic_ghost::*;
 use vstd::shared::Shared;
 use verus_state_machines_macros::*;
@@ -221,10 +222,10 @@ pub tracked struct PageSharedAccess {
 }
 
 pub tracked struct PageLocalAccess {
-    pub tracked count: cell::PointsTo<u32>,
-    pub tracked inner: cell::PointsTo<PageInner>,
-    pub tracked prev: cell::PointsTo<*mut Page>,
-    pub tracked next: cell::PointsTo<*mut Page>,
+    pub tracked count: pcell::PointsTo<u32>,
+    pub tracked inner: pcell::PointsTo<PageInner>,
+    pub tracked prev: pcell::PointsTo<*mut Page>,
+    pub tracked next: pcell::PointsTo<*mut Page>,
 }
 
 pub tracked struct PageFullAccess {
@@ -310,8 +311,8 @@ impl PageLocalAccess {
                 &&& self.prev.id() == page.prev.id()
                 &&& self.next.id() == page.next.id()
 
-                &&& match (self.count.mem_contents(), self.inner.mem_contents(), self.prev.mem_contents(), self.next.mem_contents()) {
-                    (MemContents::Init(count), MemContents::Init(page_inner), MemContents::Init(prev), MemContents::Init(next)) => {
+                &&& match (self.count.value(), self.inner.value(), self.prev.value(), self.next.value()) {
+                    (count, page_inner, prev, next) => {
                         //&&& is_page_ptr_opt(prev, page_state.prev)
                         //&&& is_page_ptr_opt(next, page_state.next)
 
@@ -322,7 +323,6 @@ impl PageLocalAccess {
                         )
                         &&& (page_state.offset != 0 ==> page_inner.zeroed_except_block_size())
                     }
-                    _ => false,
                 }
             }
             MemContents::Uninit => false,
@@ -339,17 +339,7 @@ impl PageLocalAccess {
                 &&& self.prev.id() == page.prev.id()
                 &&& self.next.id() == page.next.id()
 
-                &&& match self.inner.mem_contents() {
-                    MemContents::Init(page_inner) => {
-                        page_inner.zeroed_except_block_size()
-                        /*&& (
-                            && page_id.idx != 0 && (popped != Popped::Ready(page_id) &&
-                            !(popped.is_VeryUnready() && popped.get_VeryUnready_0() == page_id.segment_id && popped.get_VeryUnready_1() == page_id.idx))
-                            ==> page_inner.xblock_size == 0
-                        )*/
-                    }
-                    _ => false,
-                }
+                &&& self.inner.value().zeroed_except_block_size()
                 // TODO move PageData comparison in here?
             }
             MemContents::Uninit => false,
@@ -362,7 +352,6 @@ impl PageFullAccess {
         &&& self.s.points_to.is_init()
         &&& self.s.points_to.value().inner.id() == self.l.inner.id()
         &&& self.s.exposed.provenance() == self.s.points_to.ptr()@.provenance
-        &&& self.l.inner.is_init()
         &&& self.l.inner.value().zeroed()
     }
 }
@@ -451,18 +440,16 @@ impl SegmentSharedAccess {
 
 pub tracked struct SegmentLocalAccess {
     pub mem: MemChunk,
-    pub main: cell::PointsTo<SegmentHeaderMain>,
-    pub main2: cell::PointsTo<SegmentHeaderMain2>,
+    pub main: pcell::PointsTo<SegmentHeaderMain>,
+    pub main2: pcell::PointsTo<SegmentHeaderMain2>,
 }
 
 impl SegmentLocalAccess {
     pub open spec fn wf(&self, segment_id: SegmentId, segment_state: SegmentState, mim_instance: Mim::Instance) -> bool {
         &&& segment_state.shared_access.wf(segment_id, mim_instance)
         &&& segment_state.shared_access.points_to.value().main.id() == self.main.id()
-        &&& self.main.is_init()
 
         &&& segment_state.shared_access.points_to.value().main2.id() == self.main2.id()
-        &&& self.main2.is_init()
 
         &&& segment_state.is_enabled
     }
@@ -515,11 +502,11 @@ pub struct HeapSharedAccess {
 }
 
 pub struct HeapLocalAccess {
-    pub pages_free_direct: cell::PointsTo<[*mut Page; 129]>,
-    pub pages: cell::PointsTo<[PageQueue; 75]>,
-    pub page_count: cell::PointsTo<usize>,
-    pub page_retired_min: cell::PointsTo<usize>,
-    pub page_retired_max: cell::PointsTo<usize>,
+    pub pages_free_direct: pcell::PointsTo<[*mut Page; 129]>,
+    pub pages: pcell::PointsTo<[PageQueue; 75]>,
+    pub page_count: pcell::PointsTo<usize>,
+    pub page_retired_min: pcell::PointsTo<usize>,
+    pub page_retired_max: pcell::PointsTo<usize>,
 }
 
 impl Heap {
@@ -582,11 +569,6 @@ impl HeapLocalAccess {
               && heap.page_count.id() == self.page_count.id()
               && heap.page_retired_min.id() == self.page_retired_min.id()
               && heap.page_retired_max.id() == self.page_retired_max.id()
-              && self.pages_free_direct.is_init()
-              && self.pages.is_init()
-              && self.page_count.is_init()
-              && self.page_retired_min.is_init()
-              && self.page_retired_max.is_init()
 
               && (forall |i: int| #[trigger] valid_bin_idx(i) ==>
                   self.pages.value()[i].block_size == size_of_bin(i))
@@ -814,9 +796,8 @@ impl Local {
     pub open spec fn page_inner(&self, page_id: PageId) -> PageInner
         recommends
             self.pages.dom().contains(page_id),
-            self.pages.index(page_id).inner.is_init(),
     {
-        self.pages.index(page_id).inner.value()
+        *self.pages.index(page_id).inner.value()
     }
 
 
@@ -928,8 +909,8 @@ pub open spec fn page_organization_pages_match_data(
     popped: Popped) -> bool
 {
     psa.points_to.is_init() && (
-    match (pla.count.mem_contents(), pla.inner.mem_contents(), pla.prev.mem_contents(), pla.next.mem_contents()) {
-        (MemContents::Init(count), MemContents::Init(inner), MemContents::Init(prev), MemContents::Init(next)) => {
+    match (*pla.count.value(), *pla.inner.value(), *pla.prev.value(), *pla.next.value()) {
+        (count, inner, prev, next) => {
             &&& (match page_data.count {
                 None => true,
                 Some(c) => count as int == c
@@ -978,7 +959,6 @@ pub open spec fn page_organization_pages_match_data(
                 }
             })
         }
-        _ => false,
     })
 }
 
@@ -1060,7 +1040,7 @@ impl HeapPtr {
             self.wf(),
             self.is_in(*local),
         ensures
-            MemContents::Init(*pages) == local.heap.pages.mem_contents()
+            *pages == *local.heap.pages.value()
     {
         self.get_ref(Tracked(local)).pages.borrow(Tracked(&local.heap.pages))
     }
@@ -1072,7 +1052,7 @@ impl HeapPtr {
             self.wf(),
             self.is_in(*local),
         ensures
-            MemContents::Init(page_count) == local.heap.page_count.mem_contents()
+            page_count == *local.heap.page_count.value()
     {
         *self.get_ref(Tracked(local)).page_count.borrow(Tracked(&local.heap.page_count))
     }
@@ -1089,8 +1069,7 @@ impl HeapPtr {
         let tracked perm = &local.instance.thread_local_state_guards_heap(
             local.thread_id, &local.thread_token).points_to;
         let heap = ptr_ref(self.heap_ptr, Tracked(perm));
-        let _ = heap.page_count.take(Tracked(&mut local.heap.page_count));
-        heap.page_count.put(Tracked(&mut local.heap.page_count), page_count);
+        *heap.page_count.borrow_mut(Tracked(&mut local.heap.page_count)) = page_count;
     }
 
     #[inline(always)]
@@ -1100,7 +1079,7 @@ impl HeapPtr {
             self.wf(),
             self.is_in(*local),
         ensures
-            MemContents::Init(page_retired_min) == local.heap.page_retired_min.mem_contents()
+            page_retired_min == local.heap.page_retired_min.value()
     {
         *self.get_ref(Tracked(local)).page_retired_min.borrow(Tracked(&local.heap.page_retired_min))
     }
@@ -1117,8 +1096,7 @@ impl HeapPtr {
         let tracked perm = &local.instance.thread_local_state_guards_heap(
             local.thread_id, &local.thread_token).points_to;
         let heap = ptr_ref(self.heap_ptr, Tracked(perm));
-        let _ = heap.page_retired_min.take(Tracked(&mut local.heap.page_retired_min));
-        heap.page_retired_min.put(Tracked(&mut local.heap.page_retired_min), page_retired_min);
+        *heap.page_retired_min.borrow_mut(Tracked(&mut local.heap.page_retired_min)) = page_retired_min;
     }
 
     #[inline(always)]
@@ -1128,7 +1106,7 @@ impl HeapPtr {
             self.wf(),
             self.is_in(*local),
         ensures
-            MemContents::Init(page_retired_max) == local.heap.page_retired_max.mem_contents()
+            page_retired_max == local.heap.page_retired_max.value()
     {
         *self.get_ref(Tracked(local)).page_retired_max.borrow(Tracked(&local.heap.page_retired_max))
     }
@@ -1145,8 +1123,7 @@ impl HeapPtr {
         let tracked perm = &local.instance.thread_local_state_guards_heap(
             local.thread_id, &local.thread_token).points_to;
         let heap = ptr_ref(self.heap_ptr, Tracked(perm));
-        let _ = heap.page_retired_max.take(Tracked(&mut local.heap.page_retired_max));
-        heap.page_retired_max.put(Tracked(&mut local.heap.page_retired_max), page_retired_max);
+        *heap.page_retired_max.borrow_mut(Tracked(&mut local.heap.page_retired_max)) = page_retired_max;
     }
 
     #[inline(always)]
@@ -1156,7 +1133,7 @@ impl HeapPtr {
             self.wf(),
             self.is_in(*local),
         ensures
-            MemContents::Init(*pages) == local.heap.pages_free_direct.mem_contents()
+            *pages == local.heap.pages_free_direct.value()
     {
         self.get_ref(Tracked(local)).pages_free_direct.borrow(Tracked(&local.heap.pages_free_direct))
     }
@@ -1199,24 +1176,18 @@ pub open spec fn local_page_count_update(loc1: Local, loc2: Local) -> bool {
     &&& loc2 == Local { heap: loc2.heap, .. loc1 }
     &&& loc2.heap == HeapLocalAccess { page_count: loc2.heap.page_count, .. loc1.heap }
     &&& loc1.heap.page_count.id() == loc2.heap.page_count.id()
-    &&& loc1.heap.page_count.is_init()
-    &&& loc2.heap.page_count.is_init()
 }
 
 pub open spec fn local_page_retired_min_update(loc1: Local, loc2: Local) -> bool {
     &&& loc2 == Local { heap: loc2.heap, .. loc1 }
     &&& loc2.heap == HeapLocalAccess { page_retired_min: loc2.heap.page_retired_min, .. loc1.heap }
     &&& loc1.heap.page_retired_min.id() == loc2.heap.page_retired_min.id()
-    &&& loc1.heap.page_retired_min.is_init()
-    &&& loc2.heap.page_retired_min.is_init()
 }
 
 pub open spec fn local_page_retired_max_update(loc1: Local, loc2: Local) -> bool {
     &&& loc2 == Local { heap: loc2.heap, .. loc1 }
     &&& loc2.heap == HeapLocalAccess { page_retired_max: loc2.heap.page_retired_max, .. loc1.heap }
     &&& loc1.heap.page_retired_max.id() == loc2.heap.page_retired_max.id()
-    &&& loc1.heap.page_retired_max.is_init()
-    &&& loc2.heap.page_retired_max.is_init()
 }
 
 
@@ -1391,8 +1362,7 @@ impl SegmentPtr {
             local.thread_token.value().segments.index(self.segment_id@).shared_access.points_to.value().main.id()
                 == local.segments[self.segment_id@].main.id(),
             local.segments.dom().contains(self.segment_id@),
-            local.segments[self.segment_id@].main.is_init(),
-        ensures MemContents::Init(*segment_header_main) == local.segments.index(self.segment_id@).main.mem_contents()
+        ensures *segment_header_main == local.segments.index(self.segment_id@).main.value()
     {
         let segment = self.get_ref(Tracked(local));
         segment.main.borrow(Tracked(&local.segments.tracked_borrow(self.segment_id@).main))
@@ -1401,7 +1371,7 @@ impl SegmentPtr {
     #[inline(always)]
     pub fn get_main2_ref<'a>(&self, Tracked(local): Tracked<&'a Local>) -> (segment_header_main2: &'a SegmentHeaderMain2)
         requires local.wf_main(), self.wf(), self.is_in(*local),
-        ensures MemContents::Init(*segment_header_main2) == local.segments.index(self.segment_id@).main2.mem_contents()
+        ensures *segment_header_main2 == local.segments.index(self.segment_id@).main2.value()
     {
         let segment = self.get_ref(Tracked(local));
         segment.main2.borrow(Tracked(&local.segments.tracked_borrow(self.segment_id@).main2))
@@ -1588,7 +1558,7 @@ impl PagePtr {
             self.wf(),
             self.is_in(*local),
         ensures
-            MemContents::Init(*page_inner) == local.pages.index(self.page_id@).inner.mem_contents()
+            *page_inner == local.pages.index(self.page_id@).inner.value()
     {
         let page = self.get_ref(Tracked(local));
         page.inner.borrow(Tracked(
@@ -1605,10 +1575,10 @@ impl PagePtr {
             )
         ensures
             !self.is_empty_global(*local) ==> (
-                MemContents::Init(*page_inner) == local.pages.index(self.page_id@).inner.mem_contents()
+                *page_inner == local.pages.index(self.page_id@).inner.value()
             ),
             self.is_empty_global(*local) ==> (
-                MemContents::Init(*page_inner) == local.page_empty_global@.l.inner.mem_contents()
+                *page_inner == local.page_empty_global@.l.inner.value()
             ),
     {
         let tracked perm = if self.is_empty_global(*local) {
@@ -1636,7 +1606,7 @@ impl PagePtr {
             self.wf(),
             self.is_in(*local),
         ensures
-            MemContents::Init(count) == local.pages.index(self.page_id@).count.mem_contents()
+            count == local.pages.index(self.page_id@).count.value()
     {
         let page = self.get_ref(Tracked(local));
         *page.count.borrow(Tracked(
@@ -1651,7 +1621,7 @@ impl PagePtr {
             self.wf(),
             self.is_in(*local),
         ensures
-            MemContents::Init(next) == local.pages.index(self.page_id@).next.mem_contents()
+            next == local.pages.index(self.page_id@).next.value()
     {
         let page = self.get_ref(Tracked(local));
         *page.next.borrow(Tracked(
@@ -1666,7 +1636,7 @@ impl PagePtr {
             self.wf(),
             self.is_in(*local),
         ensures
-            MemContents::Init(prev) == local.pages.index(self.page_id@).prev.mem_contents()
+            prev == local.pages.index(self.page_id@).prev.value()
     {
         let page = self.get_ref(Tracked(local));
         *page.prev.borrow(Tracked(
@@ -1867,11 +1837,10 @@ macro_rules! page_get_mut_inner_internal {
 
             let tracked PageLocalAccess { inner: mut inner_0, prev: prev_0, next: next_0, count: count_0 } =
                 $local.pages.tracked_remove(page_ptr.page_id@);
-            let mut $page_inner = page.inner.take(Tracked(&mut inner_0));
+            let mut $page_inner = page.inner.borrow_mut(Tracked(&mut inner_0));
 
             { $body }
 
-            page.inner.put(Tracked(&mut inner_0), $page_inner);
             proof {
                 $local.pages.tracked_insert(page_ptr.page_id@, PageLocalAccess {
                     inner: inner_0, prev: prev_0, next: next_0, count: count_0
@@ -1904,11 +1873,11 @@ macro_rules! unused_page_get_mut_prev_internal {
 
             let tracked PageLocalAccess { inner: inner_0, prev: mut prev_0, next: next_0, count: count_0 } =
                 $local.pages.tracked_remove(page_ptr.page_id@);
-            let mut $page_prev = page.prev.take(Tracked(&mut prev_0));
+            let mut $page_prev = page.prev.read(Tracked(&mut prev_0));
 
             { $body }
 
-            page.prev.put(Tracked(&mut prev_0), $page_prev);
+            page.prev.write(Tracked(&mut prev_0), $page_prev);
             proof {
                 $local.pages.tracked_insert(page_ptr.page_id@, PageLocalAccess {
                     inner: inner_0, prev: prev_0, next: next_0, count: count_0
@@ -1940,11 +1909,10 @@ macro_rules! unused_page_get_mut_inner_internal {
 
             let tracked PageLocalAccess { inner: mut inner_0, prev: prev_0, next: next_0, count: count_0 } =
                 $local.pages.tracked_remove(page_ptr.page_id@);
-            let mut $page_inner = page.inner.take(Tracked(&mut inner_0));
+            let mut $page_inner = page.inner.borrow_mut(Tracked(&mut inner_0));
 
             { $body }
 
-            page.inner.put(Tracked(&mut inner_0), $page_inner);
             proof {
                 $local.pages.tracked_insert(page_ptr.page_id@, PageLocalAccess {
                     inner: inner_0, prev: prev_0, next: next_0, count: count_0
@@ -1977,11 +1945,11 @@ macro_rules! unused_page_get_mut_next_internal {
 
             let tracked PageLocalAccess { inner: inner_0, prev: prev_0, next: mut next_0, count: count_0 } =
                 $local.pages.tracked_remove(page_ptr.page_id@);
-            let mut $page_next = page.next.take(Tracked(&mut next_0));
+            let mut $page_next = page.next.read(Tracked(&mut next_0));
 
             { $body }
 
-            page.next.put(Tracked(&mut next_0), $page_next);
+            page.next.write(Tracked(&mut next_0), $page_next);
             proof {
                 $local.pages.tracked_insert(page_ptr.page_id@, PageLocalAccess {
                     inner: inner_0, prev: prev_0, next: next_0, count: count_0
@@ -2013,11 +1981,11 @@ macro_rules! unused_page_get_mut_count_internal {
 
             let tracked PageLocalAccess { inner: inner_0, prev: prev_0, next: next_0, count: mut count_0 } =
                 $local.pages.tracked_remove(page_ptr.page_id@);
-            let mut $page_count = page.count.take(Tracked(&mut count_0));
+            let mut $page_count = page.count.read(Tracked(&mut count_0));
 
             { $body }
 
-            page.count.put(Tracked(&mut count_0), $page_count);
+            page.count.write(Tracked(&mut count_0), $page_count);
             proof {
                 $local.pages.tracked_insert(page_ptr.page_id@, PageLocalAccess {
                     inner: inner_0, prev: prev_0, next: next_0, count: count_0
@@ -2085,11 +2053,11 @@ macro_rules! used_page_get_mut_prev_internal {
 
             let tracked PageLocalAccess { inner: inner_0, prev: mut prev_0, next: next_0, count: count_0 } =
                 $local.pages.tracked_remove(page_ptr.page_id@);
-            let mut $page_prev = page.prev.take(Tracked(&mut prev_0));
+            let mut $page_prev = page.prev.read(Tracked(&mut prev_0));
 
             { $body }
 
-            page.prev.put(Tracked(&mut prev_0), $page_prev);
+            page.prev.write(Tracked(&mut prev_0), $page_prev);
             proof {
                 $local.pages.tracked_insert(page_ptr.page_id@, PageLocalAccess {
                     inner: inner_0, prev: prev_0, next: next_0, count: count_0
@@ -2119,11 +2087,11 @@ macro_rules! heap_get_pages_internal {
             let tracked perm = &$local.instance.thread_local_state_guards_heap(
                 $local.thread_id, &$local.thread_token).points_to;
             let heap = vstd::raw_ptr::ptr_ref(heap_ptr.heap_ptr, Tracked(perm));
-            let mut $pages = heap.pages.take(Tracked(&mut $local.heap.pages));
+            let mut $pages = heap.pages.read(Tracked(&mut $local.heap.pages));
 
             { $body }
 
-            heap.pages.put(Tracked(&mut $local.heap.pages), $pages);
+            heap.pages.write(Tracked(&mut $local.heap.pages), $pages);
         } }
     }
 }
@@ -2148,11 +2116,11 @@ macro_rules! heap_get_pages_free_direct_internal {
             let tracked perm = &$local.instance.thread_local_state_guards_heap(
                 $local.thread_id, &$local.thread_token).points_to;
             let heap = vstd::raw_ptr::ptr_ref(heap_ptr.heap_ptr, Tracked(perm));
-            let mut $pages_free_direct = heap.pages_free_direct.take(Tracked(&mut $local.heap.pages_free_direct));
+            let mut $pages_free_direct = heap.pages_free_direct.read(Tracked(&mut $local.heap.pages_free_direct));
 
             { $body }
 
-            let mut $pages_free_direct = heap.pages_free_direct.put(Tracked(&mut $local.heap.pages_free_direct), $pages_free_direct);
+            let mut $pages_free_direct = heap.pages_free_direct.write(Tracked(&mut $local.heap.pages_free_direct), $pages_free_direct);
         } }
     }
 }
@@ -2183,11 +2151,11 @@ macro_rules! used_page_get_mut_next_internal {
 
             let tracked PageLocalAccess { inner: inner_0, prev: prev_0, next: mut next_0, count: count_0 } =
                 $local.pages.tracked_remove(page_ptr.page_id@);
-            let mut $page_next = page.next.take(Tracked(&mut next_0));
+            let mut $page_next = page.next.read(Tracked(&mut next_0));
 
             { $body }
 
-            page.next.put(Tracked(&mut next_0), $page_next);
+            page.next.write(Tracked(&mut next_0), $page_next);
             proof {
                 $local.pages.tracked_insert(page_ptr.page_id@, PageLocalAccess {
                     inner: inner_0, prev: prev_0, next: next_0, count: count_0
@@ -2244,11 +2212,10 @@ macro_rules! segment_get_mut_main_internal {
 
             let tracked SegmentLocalAccess { main: mut main_0, mem: mem_0, main2: main2_0 } =
                 $local.segments.tracked_remove(segment_ptr.segment_id@);
-            let mut $segment_main = segment.main.take(Tracked(&mut main_0));
+            let mut $segment_main = segment.main.borrow_mut(Tracked(&mut main_0));
 
             { $body }
 
-            segment.main.put(Tracked(&mut main_0), $segment_main);
             proof {
                 $local.segments.tracked_insert(segment_ptr.segment_id@, SegmentLocalAccess {
                     main: main_0, mem: mem_0, main2: main2_0,
@@ -2281,11 +2248,10 @@ macro_rules! segment_get_mut_main2_internal {
 
             let tracked SegmentLocalAccess { main: main_0, mem: mem_0, main2: mut main2_0 } =
                 $local.segments.tracked_remove(segment_ptr.segment_id@);
-            let mut $segment_main2 = segment.main2.take(Tracked(&mut main2_0));
+            let mut $segment_main2 = segment.main2.borrow_mut(Tracked(&mut main2_0));
 
             { $body }
 
-            segment.main2.put(Tracked(&mut main2_0), $segment_main2);
             proof {
                 $local.segments.tracked_insert(segment_ptr.segment_id@, SegmentLocalAccess {
                     main: main_0, mem: mem_0, main2: main2_0,

@@ -34,7 +34,7 @@ source code, but this is less true for the type names.
 
 Make sure [Verus](https://github.com/verus-lang/verus) is installed and `verus` is on your PATH.
 Also, make sure that it is built with `--features singular`. (See the
-[Singular setup instructions in the Verus guide](https://verus-lang.github.io/verus/guide/nonlinear_bitvec.html#setup)).
+[Singular setup instructions in the Verus guide](https://verus-lang.github.io/verus/guide/install-singular.html)).
 
 Run this:
 

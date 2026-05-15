@@ -4547,13 +4547,14 @@ state_machine!{ PageOrg {
               #![trigger self.pages.dom().contains(pid)]
               #![trigger self.pages.index(pid)]
               pid.segment_id == page_id.segment_id
-              && page_id.idx <= pid.idx < page_id.idx + count implies
-                && post.pages[pid].is_used == false
-                && post.pages[pid].full.is_none()
-                && post.pages[pid].page_header_kind.is_none()
-                && (post.pages[pid].count.is_some() <==> pid == page_id)
-                && post.pages[pid].dlist_entry.is_none()
-                && post.pages[pid].offset == Some((pid.idx - page_id.idx) as nat)
+              && page_id.idx <= pid.idx < page_id.idx + count implies {
+                &&& post.pages[pid].is_used == false
+                &&& post.pages[pid].full.is_none()
+                &&& post.pages[pid].page_header_kind.is_none()
+                &&& (post.pages[pid].count.is_some() <==> pid == page_id)
+                &&& post.pages[pid].dlist_entry.is_none()
+                &&& post.pages[pid].offset == Some((pid.idx - page_id.idx) as nat)
+              }
             by {
                 assert(pre.pages[pid].is_used == false);
                 //assert(post.pages[pid].is_used == false);

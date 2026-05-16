@@ -309,7 +309,7 @@ impl CommitMask {
             invariant
                 forall|j: int| 0 <= j < i ==> #[trigger] res.mask[j] == self.mask[j] & other.mask[j],
         {
-            res.mask.set(i, self.mask[i] & other.mask[i]);
+            res.mask[i] = self.mask[i] & other.mask[i];
             i += 1;
         }
         proof {
@@ -331,7 +331,7 @@ impl CommitMask {
                 forall|j: int| i <= j < 8 ==> #[trigger] self.mask[j] == old(self).mask[j]
         {
             let m = self.mask[i];
-            self.mask.set(i, m & !other.mask[i]);
+            self.mask[i] = m & !other.mask[i];
             i += 1;
         }
         proof {
@@ -353,7 +353,7 @@ impl CommitMask {
                 forall|j: int| i <= j < 8 ==> #[trigger] self.mask[j] == old(self).mask[j]
         {
             let m = self.mask[i];
-            self.mask.set(i, m | other.mask[i]);
+            self.mask[i] = m | other.mask[i];
             i += 1;
         }
         proof {
@@ -446,7 +446,7 @@ impl CommitMask {
                     ((1usize << c) - 1) << ofs
                 };
                 let old_self = Ghost(*self);
-                self.mask.set(i, mask);
+                self.mask[i] = mask;
                 let oi = Ghost(i);
                 let obc = Ghost(bitcount);
                 let oofs = Ghost(ofs);
@@ -545,7 +545,7 @@ impl CommitMask {
         while i < 8
             invariant forall|j: int| 0 <= j < i ==> self.mask[j] == 0
         {
-            self.mask.set(i, 0);
+            self.mask[i] = 0;
             i += 1;
         }
         proof {
@@ -562,7 +562,7 @@ impl CommitMask {
         while i < 8
             invariant forall|j: int| 0 <= j < i ==> self.mask[j] == !0usize
         {
-            self.mask.set(i, !0usize);
+            self.mask[i] = !0usize;
             i += 1;
         }
         proof {

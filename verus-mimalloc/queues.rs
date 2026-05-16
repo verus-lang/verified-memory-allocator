@@ -82,7 +82,7 @@ pub fn page_queue_remove(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(local)
 
     let ghost mut old_val;
     heap_get_pages!(heap, local, pages => {
-        let mut cq = pages[pq];
+        let mut cq = &mut pages[pq];
 
         proof { old_val = cq.first; }
 
@@ -92,8 +92,6 @@ pub fn page_queue_remove(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(local)
         if prev.addr() == 0 {
             cq.first = next;
         }
-
-        pages.set(pq, cq);
     });
 
     proof {
@@ -256,15 +254,13 @@ pub fn page_queue_push(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(local): 
     let first_in_queue;
 
     heap_get_pages!(heap, local, pages => {
-        let mut cq = pages[pq];
+        let mut cq = &mut pages[pq];
         first_in_queue = cq.first;
 
         cq.first = page.page_ptr;
         if first_in_queue.addr() == 0 {
             cq.last = page.page_ptr;
         }
-
-        pages.set(pq, cq);
     });
 
     if first_in_queue.addr() != 0 {
@@ -443,15 +439,13 @@ pub fn page_queue_push_back(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(loc
     let last_in_queue;
 
     heap_get_pages!(heap, local, pages => {
-        let mut cq = pages[pq];
+        let mut cq = &mut pages[pq];
         last_in_queue = cq.last;
 
         cq.last = page.page_ptr;
         if last_in_queue.addr() == 0 {
             cq.first = page.page_ptr;
         }
-
-        pages.set(pq, cq);
     });
 
     used_page_get_mut_next!(page, local, n => {
@@ -790,7 +784,7 @@ fn heap_queue_first_update(heap: HeapPtr, pq: usize, Tracked(local): Tracked<&mu
     {
         let ghost prev_local = *local;
         heap_get_pages_free_direct!(heap, local, pages_free_direct => {
-            pages_free_direct.set(sz, page_ptr);
+            pages_free_direct[sz] = page_ptr;
         });
         
         sz += 1;

@@ -126,7 +126,7 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
         invariant 0 <= i <= PAGES_DIRECT,
           forall |j: int| 0 <= j < i ==> pages_free_direct[j] == page_empty_ptr,
     {
-        pages_free_direct.set(i, page_empty_ptr);
+        pages_free_direct[i] = page_empty_ptr;
         i = i + 1;
     }
 
@@ -136,10 +136,10 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
           forall |j: int| 0 <= j < i ==> (#[trigger] span_queue_headers[j]).first.addr() == 0
               && span_queue_headers[j].last.addr() == 0,
     {
-        span_queue_headers.set(i, SpanQueueHeader {
+        span_queue_headers[i] = SpanQueueHeader {
             first: core::ptr::null_mut(),
             last: core::ptr::null_mut(),
-        });
+        };
         i = i + 1;
     }
 

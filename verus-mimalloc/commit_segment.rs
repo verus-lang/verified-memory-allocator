@@ -520,6 +520,15 @@ pub fn segment_delayed_decommit(
         }
         idx = next_idx;
 
+        proof {
+            // idx + count <= COMMIT_MASK_BITS (512) and COMMIT_SIZE == 65536, so the offsets
+            // stay within SEGMENT_SIZE and don't overflow the segment's address range.
+            assert((idx + count) * (COMMIT_SIZE as int) <= SEGMENT_SIZE) by (nonlinear_arith)
+                requires idx + count <= COMMIT_MASK_BITS, COMMIT_MASK_BITS == 512,
+                    COMMIT_SIZE == 65536, SEGMENT_SIZE == 33554432;
+            assert(idx * (COMMIT_SIZE as int) + count * (COMMIT_SIZE as int)
+                   == (idx + count) * (COMMIT_SIZE as int)) by (nonlinear_arith);
+        }
         let p = segment.segment_ptr.addr() + idx * COMMIT_SIZE as usize;
         let size = count * COMMIT_SIZE as usize;
         segment_commitx(segment, false, p, size, Tracked(&mut *local));

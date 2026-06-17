@@ -513,7 +513,9 @@ pub fn align_down(x: usize, y: usize) -> (res: usize)
         assert(0 <= x % y < y);
         let t = x / y;
         mul_mod_right(t as int, y as int);
-        assert(y != 0 ==> (t * y) / y as int * y == t * y) by(nonlinear_arith);
+        // (t*y) % y == 0 (from mul_mod_right) plus fundamental div-mod gives (t*y)/y*y == t*y.
+        vstd::arithmetic::div_mod::lemma_fundamental_div_mod(t as int * y as int, y as int);
+        vstd::arithmetic::mul::lemma_mul_is_commutative(y as int, (t as int * y as int) / y as int);
     }
 
     if ((y & mask) == 0) { // power of two?
@@ -546,7 +548,9 @@ pub fn align_up(x: usize, y: usize) -> (res: usize)
 
         let t = (x + y - 1) / y as int;
         mul_mod_right(t, y as int);
-        assert(y != 0 ==> (t * y) / y as int * y == t * y) by(nonlinear_arith);
+        // (t*y) % y == 0 (from mul_mod_right) plus fundamental div-mod gives (t*y)/y*y == t*y.
+        vstd::arithmetic::div_mod::lemma_fundamental_div_mod(t * y as int, y as int);
+        vstd::arithmetic::mul::lemma_mul_is_commutative(y as int, (t * y as int) / y as int);
     }
 
     if ((y & mask) == 0) { // power of two?

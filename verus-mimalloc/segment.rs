@@ -774,6 +774,17 @@ fn segment_span_allocate(
     let mut i: usize = 1;
     let ghost local_snapshot = *local;
     let extra = slice_count - 1;
+    // Establish the page-range invariant at loop entry: range_from(1, extra+1) is a subrange
+    // of range_from(0, slice_count), whose pages are all unused and well-formed.
+    assert forall |page_id|
+        #[trigger] first_page_id.range_from(1, extra + 1).contains(page_id) implies
+            local.unused_pages.dom().contains(page_id)
+            && local.unused_pages[page_id].points_to.is_init()
+            && is_page_ptr(local.unused_pages[page_id].points_to.ptr(), page_id)
+            && local.unused_pages[page_id].points_to.ptr()@.provenance == local.unused_pages[page_id].exposed.provenance()
+    by {
+        assert(local.pages.dom().contains(page_id));
+    }
     while i <= extra
         invariant 1 <= i <= extra + 1,
           first_page_id.idx + extra < SLICES_PER_SEGMENT,

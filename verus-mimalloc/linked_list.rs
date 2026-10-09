@@ -293,7 +293,8 @@ impl LL {
         self_.first = ptr;
 
         let tracked tuple = (points_to_ptr, points_to_raw, block_token, is_exposed);
-        self_.perms.borrow_mut().tracked_insert(self_.data@.len, tuple);
+        let ghost len = self_.data@.len;
+        self_.perms.borrow_mut().tracked_insert(len, tuple);
         self_.data@.len = self_.data@.len + 1;
 
         let ghost len = self_.data@.len;

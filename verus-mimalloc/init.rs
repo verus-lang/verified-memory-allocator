@@ -88,7 +88,7 @@ pub fn heap_init(Tracked(global): Tracked<Global>, // $line_count$Trusted$
     increment_thread_count();
 
     // TODO use a cache for thread data
-    let (addr, Tracked(mem)) = thread_data_alloc();
+    let (addr, Tracked(mut mem)) = thread_data_alloc();
     if addr.addr() == 0 {
         return (HeapPtr { heap_ptr: core::ptr::null_mut(), heap_id: Ghost(arbitrary()) }, Tracked(None));
     }

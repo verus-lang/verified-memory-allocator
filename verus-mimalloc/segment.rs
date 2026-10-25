@@ -958,7 +958,7 @@ fn segment_alloc(
     let mut commit_mask = CommitMask::empty();
     let mut decommit_mask = CommitMask::empty();
 
-    let (pre_segment_ptr, new_psegment_slices, new_ppre_size, new_pinfo_slices, is_zero, pcommit, memid, mem_large, is_pinned, align_offset, Tracked(mem_chunk)) = segment_os_alloc(
+    let (pre_segment_ptr, new_psegment_slices, new_ppre_size, new_pinfo_slices, is_zero, pcommit, memid, mem_large, is_pinned, align_offset, Tracked(mut mem_chunk)) = segment_os_alloc(
         required,
         page_alignment,
         eager_delay,

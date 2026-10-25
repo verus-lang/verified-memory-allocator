@@ -52,7 +52,7 @@ pub fn arena_alloc_aligned(
     // mem_id: usize
 {
     // TODO arena allocation
-    let (p, is_large, Tracked(mem)) = os_alloc_aligned_offset(size, alignment, align_offset, request_commit, allow_large);
+    let (p, is_large, Tracked(mut mem)) = os_alloc_aligned_offset(size, alignment, align_offset, request_commit, allow_large);
     let did_commit = request_commit;
     let is_pinned = is_large;
     let is_zero = true;

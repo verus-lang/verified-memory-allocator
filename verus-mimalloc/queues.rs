@@ -113,7 +113,7 @@ pub fn page_queue_remove(heap: HeapPtr, pq: usize, page: PagePtr, Tracked(local)
     // page->prev = NULL;
     // mi_page_set_in_full(page, false)
 
-    proof {
+    assert(local.wf_main()) by {
         let pfd = local.heap.pages_free_direct.value()@;
         let emp = local.page_empty_global@.s.points_to.ptr();
         let pages = local.heap.pages.value()@;
